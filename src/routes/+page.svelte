@@ -2,37 +2,10 @@
 	import type { PageProps } from './$types';
   import maplibregl from 'maplibre-gl';
   import { MapLibre, Marker, NavigationControl, ScaleControl, GlobeControl } from 'svelte-maplibre-gl';
-  import { config, geocoding, coordinates } from '@maptiler/client';
-
-  config.apiKey = 'QeycPm3IkJZ8kpEiIzxC';
 
 	let { data }: PageProps = $props();
 
-  let locations = [
-    'dallas',
-    'seattle',
-    'portland',
-    'kansas city',
-    'los angeles'
-  ]
-
-  // const result = await geocoding.forward("paris");
-  let result = getGeocoded();
-
-  async function getGeocoded() {
-    const geocoded = await geocoding.forward("paris");
-    console.log(geocoded.features[0].geometry.coordinates)
-    return geocoded.features[0].geometry.coordinates
-  }
-
   
-
-  let lnglat = $state([
-    { lng: result[0], lat: result[1] },
-    { lng: -122.1770818, lat: 48.0517637 },
-    { lng: -117.22864779999999, lat: 33.7825194 },
-    { lng: -81.6943605, lat: 41.499320000000004 },
-  ]);
   // let lngLatText = $derived(`(${lnglat.lat.toFixed(3)}, ${lnglat.lng.toFixed(3)})`);
   let popupOpen = $state(true);
   let offset = $state(24);
@@ -51,8 +24,9 @@
   <GlobeControl />
 
   <!-- {#await } -->
-  {#each lnglat as ll}
-  <Marker lnglat={ll} draggable>
+  <!-- {#await } -->
+  {#each data.lnglats as lnglat}
+  <Marker lnglat={lnglat}>
     {#snippet content()}
       <div class="text-center leading-none">
         <div class="text-3xl">🐶</div>

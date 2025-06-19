@@ -8,10 +8,10 @@
 		"resolveJsonModule": true,
 		"skipLibCheck": true,
 		"sourceMap": true,
-		"strict": true,
+		"strict": false,
 		"moduleResolution": "bundler",
 		// "module": "es2022",
-		// "target": "es2022",
+		"target": "es2022",
 		// "topLevelAwait": true
 	}
 	// Path aliases are handled by https://svelte.dev/docs/kit/configuration#alias
