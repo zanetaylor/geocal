@@ -40,7 +40,12 @@ export const load: PageServerLoad = async ({ fetch, url }) => {
 	const warnings: string[] = [];
 
 	try {
-		const response = await fetch(FEED_URL);
+		const response = await fetch(FEED_URL, {
+			headers: {
+				'User-Agent': 'calmap/0.0.1',
+				Accept: 'text/calendar,*/*'
+			}
+		});
 
 		if (!response.ok) {
 			return {
