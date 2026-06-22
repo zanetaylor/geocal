@@ -35,10 +35,29 @@ export type CalendarEvent = {
 
 const geocodeCache = new Map<string, [number, number] | null>();
 
-export const load: PageServerLoad = async ({ url }) => {
+export const load: PageServerLoad = async ({ fetch, url }) => {
 	const range = getDateRange(url.searchParams);
+	const sourceUrl = readFeedUrlSearchParam(url.searchParams);
 
-	return emptyCalendarResult(range);
+	if (!sourceUrl) {
+		return emptyCalendarResult(range);
+	}
+
+	try {
+		const calendarSource = await fetchCalendarFeed(fetch, sourceUrl);
+
+		return await processCalendarText(calendarSource.text, range, {
+			sourceUrl,
+			sourceName: calendarSource.name
+		});
+	} catch (error) {
+		return {
+			...emptyCalendarResult(range),
+			sourceUrl,
+			warnings: [error instanceof Error ? error.message : 'Unable to load calendar.'],
+			feedError: true
+		};
+	}
 };
 
 export const actions: Actions = {
@@ -327,6 +346,18 @@ function parseFeedUrl(value: string) {
 
 function readFormString(value: FormDataEntryValue | null) {
 	return typeof value === 'string' ? value.trim() : '';
+}
+
+function readFeedUrlSearchParam(searchParams: URLSearchParams) {
+	for (const name of ['feedUrl', 'icalUrl', 'url']) {
+		const value = searchParams.get(name)?.trim();
+
+		if (value) {
+			return value;
+		}
+	}
+
+	return '';
 }
 
 function eventInRange(event: CalendarEvent, start: Date, end: Date) {
