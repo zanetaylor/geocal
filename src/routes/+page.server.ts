@@ -1,12 +1,12 @@
 import { env } from '$env/dynamic/private';
 import { config, geocoding } from '@maptiler/client';
 import * as ICAL from 'cal-parser';
-import type { PageServerLoad } from './$types';
+import type { Actions, PageServerLoad } from './$types';
 
-const FEED_URL = 'https://www.shift2bikes.org/cal/shift-calendar.php';
 const PORTLAND_CENTER: [number, number] = [-122.676483, 45.523064];
 const MAX_RANGE_DAYS = 31;
 const GEOCODE_BATCH_SIZE = 10;
+const MAX_UPLOAD_SIZE = 5 * 1024 * 1024;
 
 type ParsedField = { value?: unknown } | string | Date | undefined;
 
@@ -35,29 +35,109 @@ export type CalendarEvent = {
 
 const geocodeCache = new Map<string, [number, number] | null>();
 
-export const load: PageServerLoad = async ({ fetch, url }) => {
+export const load: PageServerLoad = async ({ url }) => {
 	const range = getDateRange(url.searchParams);
-	const warnings: string[] = [];
 
-	try {
-		const response = await fetch(FEED_URL, {
-			headers: {
-				'User-Agent': 'calmap/0.0.1',
-				Accept: 'text/calendar,*/*'
-			}
-		});
+	return emptyCalendarResult(range);
+};
 
-		if (!response.ok) {
+export const actions: Actions = {
+	default: async ({ fetch, request }) => {
+		const formData = await request.formData();
+		const range = getDateRange(formDataToSearchParams(formData));
+		const sourceUrl = readFormString(formData.get('feedUrl'));
+		const calendarFile = formData.get('calendarFile');
+		const hasUpload = calendarFile instanceof File && calendarFile.size > 0;
+
+		if (sourceUrl && hasUpload) {
 			return {
-				events: [],
-				startDate: range.startDate,
-				endDate: range.endDate,
-				warnings: [`Calendar feed returned ${response.status}.`],
+				...emptyCalendarResult(range),
+				sourceUrl,
+				sourceName: calendarFile.name,
+				warnings: ['Enter a feed URL or upload an iCal file, not both.'],
 				feedError: true
 			};
 		}
 
-		const calendarText = await response.text();
+		if (!sourceUrl && !hasUpload) {
+			return {
+				...emptyCalendarResult(range),
+				warnings: ['Enter an iCal feed URL or upload an .ics file.'],
+				feedError: true
+			};
+		}
+
+		try {
+			const calendarSource = hasUpload
+				? await readUploadedCalendar(calendarFile)
+				: await fetchCalendarFeed(fetch, sourceUrl);
+
+			return await processCalendarText(calendarSource.text, range, {
+				sourceUrl,
+				sourceName: calendarSource.name
+			});
+		} catch (error) {
+			return {
+				...emptyCalendarResult(range),
+				sourceUrl,
+				sourceName: hasUpload ? calendarFile.name : null,
+				warnings: [error instanceof Error ? error.message : 'Unable to load calendar.'],
+				feedError: true
+			};
+		}
+	}
+};
+
+function emptyCalendarResult(range: ReturnType<typeof getDateRange>) {
+	return {
+		events: [],
+		startDate: range.startDate,
+		endDate: range.endDate,
+		sourceUrl: '',
+		sourceName: null as string | null,
+		warnings: [] as string[],
+		feedError: false
+	};
+}
+
+async function fetchCalendarFeed(fetch: typeof globalThis.fetch, sourceUrl: string) {
+	const url = parseFeedUrl(sourceUrl);
+	const response = await fetch(url, {
+		headers: {
+			'User-Agent': 'calmap/0.0.1',
+			Accept: 'text/calendar,*/*'
+		}
+	});
+
+	if (!response.ok) {
+		throw new Error(`Calendar feed returned ${response.status}.`);
+	}
+
+	return {
+		text: await response.text(),
+		name: url.toString()
+	};
+}
+
+async function readUploadedCalendar(calendarFile: File) {
+	if (calendarFile.size > MAX_UPLOAD_SIZE) {
+		throw new Error('Uploaded iCal file must be 5 MB or smaller.');
+	}
+
+	return {
+		text: await calendarFile.text(),
+		name: calendarFile.name
+	};
+}
+
+async function processCalendarText(
+	calendarText: string,
+	range: ReturnType<typeof getDateRange>,
+	source: { sourceUrl: string; sourceName: string | null }
+) {
+	const warnings: string[] = [];
+
+	try {
 		const parsed = ICAL.parseString(calendarText) as { events?: ParsedEvent[] };
 		const events = (parsed.events ?? [])
 			.map(normalizeEvent)
@@ -77,6 +157,8 @@ export const load: PageServerLoad = async ({ fetch, url }) => {
 			events,
 			startDate: range.startDate,
 			endDate: range.endDate,
+			sourceUrl: source.sourceUrl,
+			sourceName: source.sourceName,
 			warnings,
 			feedError: false
 		};
@@ -85,11 +167,13 @@ export const load: PageServerLoad = async ({ fetch, url }) => {
 			events: [],
 			startDate: range.startDate,
 			endDate: range.endDate,
-			warnings: [error instanceof Error ? error.message : 'Unable to load calendar feed.'],
+			sourceUrl: source.sourceUrl,
+			sourceName: source.sourceName,
+			warnings: [error instanceof Error ? error.message : 'Unable to parse calendar.'],
 			feedError: true
 		};
 	}
-};
+}
 
 function normalizeEvent(event: ParsedEvent): CalendarEvent | null {
 	const start = readDate(event.dtstart);
@@ -212,6 +296,37 @@ function getDateRange(searchParams: URLSearchParams) {
 		start: new Date(`${startDate}T00:00:00`),
 		end: new Date(`${endDate}T23:59:59.999`)
 	};
+}
+
+function formDataToSearchParams(formData: FormData) {
+	const searchParams = new URLSearchParams();
+	const start = readFormString(formData.get('start'));
+	const end = readFormString(formData.get('end'));
+
+	if (start) searchParams.set('start', start);
+	if (end) searchParams.set('end', end);
+
+	return searchParams;
+}
+
+function parseFeedUrl(value: string) {
+	let url: URL;
+
+	try {
+		url = new URL(value);
+	} catch {
+		throw new Error('Enter a valid iCal feed URL.');
+	}
+
+	if (!['http:', 'https:'].includes(url.protocol)) {
+		throw new Error('iCal feed URL must start with http:// or https://.');
+	}
+
+	return url;
+}
+
+function readFormString(value: FormDataEntryValue | null) {
+	return typeof value === 'string' ? value.trim() : '';
 }
 
 function eventInRange(event: CalendarEvent, start: Date, end: Date) {

@@ -2,13 +2,12 @@
 	import type { PageProps } from './$types';
 	import { MapLibre, Marker, NavigationControl, Popup, ScaleControl } from 'svelte-maplibre-gl';
 
-	let { data }: PageProps = $props();
+	let { data, form }: PageProps = $props();
 	let selectedId = $state<string | null>(null);
+	let calendar = $derived(form ?? data);
 
-	let mappedEvents = $derived(data.events.filter((event) => event.coordinates));
-	let unmappedCount = $derived(data.events.length - mappedEvents.length);
-	let defaultEndDate = $derived(getDateInputAfter(data.startDate, 7));
-	let nextWeekHref = $derived(`/?start=${data.startDate}&end=${defaultEndDate}`);
+	let mappedEvents = $derived(calendar.events.filter((event) => event.coordinates));
+	let unmappedCount = $derived(calendar.events.length - mappedEvents.length);
 
 	const dateFormatter = new Intl.DateTimeFormat('en-US', {
 		weekday: 'short',
@@ -25,72 +24,82 @@
 	function descriptionPreview(value: string) {
 		return value.length > 220 ? `${value.slice(0, 220).trim()}...` : value;
 	}
-
-	function getDateInputAfter(value: string, days: number) {
-		const date = new Date(`${value}T00:00:00`);
-		date.setDate(date.getDate() + days);
-
-		return date.toISOString().slice(0, 10);
-	}
 </script>
 
 <svelte:head>
 	<title>CalMap</title>
-	<meta
-		name="description"
-		content="Interactive map of public calendar events from the Shift2Bikes feed."
-	/>
+	<meta name="description" content="Interactive map of events from an iCal feed or uploaded iCal file." />
 </svelte:head>
 
-<main class="min-h-screen bg-slate-950 text-slate-100">
-	<section class="border-b border-white/10 bg-slate-950/95 px-4 py-5 shadow-2xl shadow-black/20 sm:px-6 lg:px-8">
-		<div class="mx-auto flex max-w-7xl flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+<main class="min-h-screen bg-neutral-950 text-neutral-100">
+	<section class="bg-neutral-950 px-4 py-5 shadow-2xl shadow-black/20 sm:px-6 lg:px-8">
+		<div class="mx-auto flex max-w-7xl flex-col gap-5">
 			<div>
-				<p class="text-sm font-medium uppercase tracking-[0.3em] text-cyan-300">CalMap</p>
+				<p class="text-sm font-medium uppercase tracking-[0.3em] text-neutral-400">CalMap</p>
 				<h1 class="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">Portland calendar events on a map</h1>
-				<p class="mt-2 max-w-2xl text-sm text-slate-300">
-					Live events from the Shift2Bikes public calendar, filtered by date and geocoded for quick scanning.
+				<p class="mt-2 max-w-2xl text-sm text-neutral-300">
+					Load an iCal feed URL or upload an .ics file, then filter and geocode events for quick scanning.
 				</p>
 			</div>
 
-			<form method="GET" class="grid gap-3 rounded-2xl border border-white/10 bg-white/5 p-3 sm:grid-cols-[1fr_1fr_auto_auto] sm:items-end">
-				<label class="grid gap-1 text-sm font-medium text-slate-200">
+			<form
+				method="POST"
+				enctype="multipart/form-data"
+				class="grid w-full grid-cols-[minmax(14rem,2fr)_minmax(12rem,1.5fr)_minmax(9rem,0.8fr)_minmax(9rem,0.8fr)_auto] items-end gap-3 overflow-x-auto bg-neutral-900 p-3"
+			>
+				<label class="grid gap-1 text-sm font-medium text-neutral-200">
+					<span>iCal feed URL</span>
+					<input
+						class="min-w-0 bg-neutral-800 px-3 py-2 text-neutral-100 outline-none ring-blue-300/40 transition placeholder:text-neutral-500 focus:ring-4"
+						type="url"
+						name="feedUrl"
+						value={calendar.sourceUrl}
+						placeholder="https://example.com/calendar.ics"
+					/>
+				</label>
+				<label class="grid gap-1 text-sm font-medium text-neutral-200">
+					<span>iCal file</span>
+					<input
+						class="min-w-0 bg-neutral-800 px-3 py-2 text-sm text-neutral-100 outline-none file:mr-3 file:border-0 file:bg-blue-500 file:px-3 file:py-1.5 file:font-semibold file:text-white file:hover:bg-blue-400"
+						type="file"
+						name="calendarFile"
+						accept=".ics,text/calendar"
+					/>
+				</label>
+				<label class="grid gap-1 text-sm font-medium text-neutral-200">
 					<span>Start</span>
 					<input
-						class="rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-slate-100 outline-none ring-cyan-300/40 transition focus:ring-4"
+						class="bg-neutral-800 px-3 py-2 text-neutral-100 outline-none ring-blue-300/40 transition focus:ring-4"
 						type="date"
 						name="start"
-						value={data.startDate}
+						value={calendar.startDate}
 					/>
 				</label>
-				<label class="grid gap-1 text-sm font-medium text-slate-200">
+				<label class="grid gap-1 text-sm font-medium text-neutral-200">
 					<span>End</span>
 					<input
-						class="rounded-xl border border-white/10 bg-slate-900 px-3 py-2 text-slate-100 outline-none ring-cyan-300/40 transition focus:ring-4"
+						class="bg-neutral-800 px-3 py-2 text-neutral-100 outline-none ring-blue-300/40 transition focus:ring-4"
 						type="date"
 						name="end"
-						value={data.endDate}
+						value={calendar.endDate}
 					/>
 				</label>
-				<button class="rounded-xl bg-cyan-300 px-4 py-2 font-semibold text-slate-950 transition hover:bg-cyan-200" type="submit">
-					Filter
+				<button class="bg-blue-500 px-4 py-2 font-semibold text-white transition hover:bg-blue-400" type="submit">
+					Load calendar
 				</button>
-				<a class="rounded-xl border border-white/10 px-4 py-2 text-center font-semibold text-slate-100 transition hover:bg-white/10" href={nextWeekHref}>
-					Next 7 days
-				</a>
 			</form>
 		</div>
 	</section>
 
-	<section class="mx-auto grid max-w-7xl gap-4 px-4 py-4 sm:px-6 lg:grid-cols-[minmax(0,1fr)_420px] lg:px-8">
-		<div class="overflow-hidden rounded-3xl border border-white/10 bg-slate-900 shadow-2xl shadow-black/30">
-			<div class="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-4 py-3">
+	<section class="mx-auto grid max-w-7xl gap-4 py-4 lg:grid-cols-[minmax(0,1fr)_420px]">
+		<div class="overflow-hidden bg-neutral-900 shadow-2xl shadow-black/30">
+			<div class="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
 				<div>
 					<h2 class="font-semibold">Map</h2>
-					<p class="text-sm text-slate-400">{mappedEvents.length} mapped / {data.events.length} total events</p>
+					<p class="text-sm text-neutral-400">{mappedEvents.length} mapped / {calendar.events.length} total events</p>
 				</div>
 				{#if unmappedCount > 0}
-					<p class="rounded-full bg-amber-400/10 px-3 py-1 text-sm text-amber-200">{unmappedCount} not mapped</p>
+					<p class="bg-neutral-800 px-3 py-1 text-sm text-neutral-300">{unmappedCount} not mapped</p>
 				{/if}
 			</div>
 
@@ -108,7 +117,7 @@
 						<Marker lnglat={event.coordinates}>
 							{#snippet content()}
 								<button
-									class="grid h-8 w-8 place-items-center rounded-full border-2 border-white bg-cyan-400 text-sm font-black text-slate-950 shadow-lg shadow-slate-950/40 transition hover:scale-110"
+									class="grid h-8 w-8 place-items-center bg-blue-500 text-sm font-black text-white shadow-lg shadow-neutral-950/40 transition hover:scale-110"
 									type="button"
 									title={event.title}
 									onclick={() => (selectedId = selectedId === event.id ? null : event.id)}
@@ -118,13 +127,13 @@
 							{/snippet}
 						</Marker>
 
-						<Popup lnglat={event.coordinates} open={selectedId === event.id} offset={24} class="max-w-xs text-slate-950">
+						<Popup lnglat={event.coordinates} open={selectedId === event.id} offset={24} class="max-w-xs text-neutral-950">
 							<div class="space-y-2 p-1">
 								<h3 class="font-semibold leading-tight">{event.title}</h3>
-								<p class="text-sm text-slate-600">{formatDate(event.start)}</p>
+								<p class="text-sm text-neutral-600">{formatDate(event.start)}</p>
 								<p class="text-sm">{event.location}</p>
 								{#if event.url}
-									<a class="text-sm font-semibold text-cyan-700 underline" href={event.url} target="_blank" rel="noreferrer">Source event</a>
+									<a class="text-sm font-semibold text-blue-700 underline" href={event.url} target="_blank" rel="noreferrer">Source event</a>
 								{/if}
 							</div>
 						</Popup>
@@ -133,56 +142,56 @@
 			</div>
 		</div>
 
-		<aside class="rounded-3xl border border-white/10 bg-white/[0.04] lg:max-h-[calc(100vh-178px)] lg:overflow-hidden">
-			<div class="border-b border-white/10 p-4">
+		<aside class="bg-neutral-900 lg:max-h-[calc(100vh-178px)] lg:overflow-hidden">
+			<div class="p-4">
 				<h2 class="text-xl font-semibold">Events</h2>
-				<p class="mt-1 text-sm text-slate-400">{data.events.length} events between {data.startDate} and {data.endDate}</p>
+				<p class="mt-1 text-sm text-neutral-400">{calendar.events.length} events between {calendar.startDate} and {calendar.endDate}</p>
 			</div>
 
-			{#if data.warnings.length}
-				<div class="space-y-2 border-b border-white/10 p-4">
-					{#each data.warnings as warning}
-						<p class="rounded-2xl bg-amber-400/10 px-3 py-2 text-sm text-amber-100">{warning}</p>
+			{#if calendar.warnings.length}
+				<div class="space-y-2 p-4">
+					{#each calendar.warnings as warning}
+						<p class="bg-neutral-800 px-3 py-2 text-sm text-neutral-200">{warning}</p>
 					{/each}
 				</div>
 			{/if}
 
-			{#if data.feedError}
-				<div class="p-6 text-slate-300">The calendar feed could not be loaded. Try again later.</div>
-			{:else if data.events.length === 0}
-				<div class="p-6 text-slate-300">No events found for this date range.</div>
+			{#if calendar.feedError}
+				<div class="p-6 text-neutral-300">The calendar could not be loaded.</div>
+			{:else if calendar.events.length === 0}
+				<div class="p-6 text-neutral-300">Load an iCal feed URL or upload an .ics file to map events.</div>
 			{:else}
-				<div class="divide-y divide-white/10 lg:max-h-[calc(100vh-275px)] lg:overflow-auto">
-					{#each data.events as event (event.id)}
-						<article class={`p-4 transition hover:bg-white/[0.03] ${selectedId === event.id ? 'bg-cyan-300/10' : ''}`}>
+				<div class="divide-y divide-neutral-800 lg:max-h-[calc(100vh-275px)] lg:overflow-auto">
+					{#each calendar.events as event (event.id)}
+						<article class={`p-4 transition hover:bg-neutral-800/60 ${selectedId === event.id ? 'bg-neutral-800' : ''}`}>
 							<div class="flex items-start justify-between gap-3">
 								<div>
 									<h3 class="font-semibold leading-tight">{event.title}</h3>
-									<p class="mt-1 text-sm text-cyan-200">{formatDate(event.start)}</p>
+									<p class="mt-1 text-sm text-neutral-300">{formatDate(event.start)}</p>
 								</div>
 								{#if event.coordinates}
 									<button
-										class="shrink-0 rounded-full border border-cyan-300/40 px-3 py-1 text-xs font-semibold text-cyan-100 hover:bg-cyan-300/10"
+										class="shrink-0 bg-blue-500 px-3 py-1 text-xs font-semibold text-white hover:bg-blue-400"
 										type="button"
 										onclick={() => (selectedId = selectedId === event.id ? null : event.id)}
 									>
 										Map
 									</button>
 								{:else}
-									<span class="shrink-0 rounded-full bg-slate-800 px-3 py-1 text-xs text-slate-400">Unmapped</span>
+									<span class="shrink-0 bg-neutral-800 px-3 py-1 text-xs text-neutral-400">Unmapped</span>
 								{/if}
 							</div>
 
 							{#if event.location}
-								<p class="mt-3 text-sm font-medium text-slate-200">{event.location}</p>
+								<p class="mt-3 text-sm font-medium text-neutral-200">{event.location}</p>
 							{/if}
 
 							{#if event.description}
-								<p class="mt-2 text-sm leading-6 text-slate-400">{descriptionPreview(event.description)}</p>
+								<p class="mt-2 text-sm leading-6 text-neutral-400">{descriptionPreview(event.description)}</p>
 							{/if}
 
 							{#if event.url}
-								<a class="mt-3 inline-flex text-sm font-semibold text-cyan-300 hover:text-cyan-200" href={event.url} target="_blank" rel="noreferrer">
+								<a class="mt-3 inline-flex text-sm font-semibold text-blue-300 hover:text-blue-200" href={event.url} target="_blank" rel="noreferrer">
 									Open source event
 								</a>
 							{/if}
