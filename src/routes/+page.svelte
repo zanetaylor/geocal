@@ -32,7 +32,7 @@
 </script>
 
 <svelte:head>
-	<title>geocal - map your events</title>
+	<title>Geocal - A map of events</title>
 	<meta name="description" content="Interactive map of events from an iCal feed or uploaded iCal file." />
 </svelte:head>
 
@@ -40,20 +40,19 @@
 	<section class="bg-neutral-950 p-5 shadow-2xl shadow-black/20 sm:p-6 lg:p-8">
 		<div class="mx-auto flex flex-col gap-5">
 			<div>
-				<p class="text-sm font-medium uppercase tracking-[0.3em] text-neutral-400">geocal</p>
-				<h1 class="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">Map your events</h1>
+				<h1 class="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">geocal</h1>
 				<p class="mt-2 max-w-2xl text-sm text-neutral-300">
-					Load an iCal feed URL or upload an .ics file to see the events on the map.
+					Enter a public iCal feed URL or upload an .ics file to see the events on the map.
 				</p>
 			</div>
 
 			<form
 				method="POST"
 				enctype="multipart/form-data"
-				class="grid w-full grid-cols-[minmax(14rem,2fr)_minmax(12rem,1.5fr)_minmax(9rem,0.8fr)_minmax(9rem,0.8fr)_auto] items-end gap-3 overflow-x-auto bg-neutral-900 p-3"
+				class="grid w-full grid-cols-[minmax(14rem,2fr)_minmax(12rem,1.5fr)_minmax(9rem,0.8fr)_minmax(9rem,0.8fr)_auto] items-end gap-3 overflow-x-auto"
 			>
 				<label class="grid gap-1 text-sm font-medium text-neutral-200">
-					<span>iCal feed URL</span>
+					<span>Public iCal feed URL</span>
 					<input
 						class="h-11 min-w-0 bg-neutral-800 px-3 text-neutral-100 outline-none ring-blue-300/40 transition placeholder:text-neutral-500 focus:ring-4"
 						type="url"
@@ -90,7 +89,7 @@
 					/>
 				</label>
 				<button class="h-11 bg-blue-500 px-4 font-semibold text-white transition hover:bg-blue-400" type="submit">
-					Load calendar
+				Go!
 				</button>
 			</form>
 		</div>
