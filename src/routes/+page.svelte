@@ -9,21 +9,30 @@
 	let mappedEvents = $derived(calendar.events.filter((event) => event.coordinates));
 	let unmappedCount = $derived(calendar.events.length - mappedEvents.length);
 	let eventSummary = $derived(
-		`${mappedEvents.length} mapped / ${calendar.events.length} total events between ${calendar.startDate} and ${calendar.endDate}${
+		`${mappedEvents.length} mapped / ${calendar.events.length} events from ${formatDateOnly(calendar.startDate)} and ${formatDateOnly(calendar.endDate)}${
 			unmappedCount > 0 ? ` - ${unmappedCount} not mapped` : ''
 		}`
 	);
 
 	const dateFormatter = new Intl.DateTimeFormat('en-US', {
-		weekday: 'short',
-		month: 'short',
+		month: 'numeric',
 		day: 'numeric',
+		year: 'numeric'
+	});
+	const dateTimeFormatter = new Intl.DateTimeFormat('en-US', {
+		month: 'numeric',
+		day: 'numeric',
+		year: 'numeric',
 		hour: 'numeric',
 		minute: '2-digit'
 	});
 
+	function formatDateOnly(value: string) {
+		return dateFormatter.format(new Date(`${value}T00:00:00`));
+	}
+
 	function formatDate(value: string) {
-		return dateFormatter.format(new Date(value));
+		return dateTimeFormatter.format(new Date(value));
 	}
 
 	function descriptionPreview(value: string) {
@@ -32,7 +41,7 @@
 </script>
 
 <svelte:head>
-	<title>Geocal - A map of events</title>
+	<title>geocal - a map of events</title>
 	<meta name="description" content="Interactive map of events from an iCal feed or uploaded iCal file." />
 </svelte:head>
 
@@ -42,7 +51,7 @@
 			<div>
 				<h1 class="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">geocal</h1>
 				<p class="mt-2 max-w-2xl text-sm text-neutral-300">
-					Enter a public iCal feed URL or upload an .ics file to see the events on the map.
+					Enter a public ICS feed URL or upload an .ics file to see the events on the map.
 				</p>
 			</div>
 
@@ -52,9 +61,9 @@
 				class="grid w-full grid-cols-[minmax(14rem,2fr)_minmax(12rem,1.5fr)_minmax(9rem,0.8fr)_minmax(9rem,0.8fr)_auto] items-end gap-3 overflow-x-auto"
 			>
 				<label class="grid gap-1 text-sm font-medium text-neutral-200">
-					<span>Public iCal feed URL</span>
+					<span>Public ICS feed URL</span>
 					<input
-						class="h-11 min-w-0 bg-neutral-800 px-3 text-neutral-100 outline-none ring-blue-300/40 transition placeholder:text-neutral-500 focus:ring-4"
+						class="h-11 min-w-0 rounded-xs bg-neutral-800 px-3 text-neutral-100 outline-none ring-teal-300/40 transition placeholder:text-neutral-500 focus:ring-4"
 						type="url"
 						name="feedUrl"
 						value={calendar.sourceUrl}
@@ -62,9 +71,9 @@
 					/>
 				</label>
 				<label class="grid gap-1 text-sm font-medium text-neutral-200">
-					<span>iCal file</span>
+					<span>ICS file</span>
 					<input
-						class="h-11 min-w-0 bg-neutral-800 px-3 text-sm text-neutral-100 outline-none file:mr-3 file:h-8 file:border-0 file:bg-blue-500 file:px-3 file:font-semibold file:text-white file:hover:bg-blue-400"
+						class="h-11 min-w-0 rounded-xs bg-neutral-800 px-3 text-sm text-neutral-100 outline-none file:mr-3 file:h-8 file:rounded-xs file:border-0 file:bg-teal-500 file:px-3 file:font-semibold file:text-white file:hover:bg-teal-400"
 						type="file"
 						name="calendarFile"
 						accept=".ics,text/calendar"
@@ -73,7 +82,7 @@
 				<label class="grid gap-1 text-sm font-medium text-neutral-200">
 					<span>Start</span>
 					<input
-						class="h-11 bg-neutral-800 px-3 text-neutral-100 outline-none ring-blue-300/40 transition focus:ring-4"
+						class="h-11 rounded-xs bg-neutral-800 px-3 text-neutral-100 outline-none ring-teal-300/40 transition focus:ring-4"
 						type="date"
 						name="start"
 						value={calendar.startDate}
@@ -82,13 +91,13 @@
 				<label class="grid gap-1 text-sm font-medium text-neutral-200">
 					<span>End</span>
 					<input
-						class="h-11 bg-neutral-800 px-3 text-neutral-100 outline-none ring-blue-300/40 transition focus:ring-4"
+						class="h-11 rounded-xs bg-neutral-800 px-3 text-neutral-100 outline-none ring-teal-300/40 transition focus:ring-4"
 						type="date"
 						name="end"
 						value={calendar.endDate}
 					/>
 				</label>
-				<button class="h-11 bg-blue-500 px-4 font-semibold text-white transition hover:bg-blue-400" type="submit">
+				<button class="h-11 rounded-xs bg-teal-500 px-4 font-semibold text-white transition hover:bg-teal-400" type="submit">
 				Go!
 				</button>
 			</form>
@@ -110,7 +119,7 @@
 					<Marker lnglat={event.coordinates}>
 						{#snippet content()}
 							<button
-								class="grid h-8 w-8 place-items-center bg-blue-500 text-sm font-black text-white shadow-lg shadow-neutral-950/40 transition hover:scale-110"
+								class="grid h-8 w-8 place-items-center bg-teal-500 text-sm font-black text-white shadow-lg shadow-neutral-950/40 transition hover:scale-110"
 								type="button"
 								title={event.title}
 								onclick={() => (selectedId = selectedId === event.id ? null : event.id)}
@@ -126,7 +135,7 @@
 							<p class="text-sm text-neutral-600">{formatDate(event.start)}</p>
 							<p class="text-sm">{event.location}</p>
 							{#if event.url}
-								<a class="text-sm font-semibold text-blue-700 underline" href={event.url} target="_blank" rel="noreferrer">Source event</a>
+								<a class="text-sm font-semibold text-teal-700 underline" href={event.url} target="_blank" rel="noreferrer">Source event</a>
 							{/if}
 						</div>
 					</Popup>
@@ -134,7 +143,7 @@
 			</MapLibre>
 		</div>
 
-		<aside class="absolute inset-x-3 bottom-3 z-10 flex max-h-[48%] flex-col overflow-hidden bg-neutral-950/90 shadow-2xl shadow-black/40 backdrop-blur sm:inset-x-4 sm:bottom-4 lg:inset-x-auto lg:inset-y-8 lg:left-8 lg:w-[420px] lg:max-h-none">
+		<aside class="absolute inset-x-3 bottom-3 z-10 flex max-h-[48%] flex-col overflow-hidden rounded-xs bg-neutral-950/85 backdrop-blur sm:inset-x-4 sm:bottom-4 lg:inset-x-auto lg:inset-y-8 lg:left-8 lg:w-[420px] lg:max-h-none">
 			<div class="p-4">
 				<h2 class="text-xl font-semibold">Events</h2>
 				<p class="mt-1 text-sm text-neutral-400">{eventSummary}</p>
@@ -151,7 +160,7 @@
 			{#if calendar.feedError}
 				<div class="p-6 text-neutral-300">The calendar could not be loaded.</div>
 			{:else if calendar.events.length === 0}
-				<div class="p-6 text-neutral-300">Load an iCal feed URL or upload an .ics file to map events.</div>
+				<div class="p-3 bg-red-800 text-neutral-300 text-sm">Load an iCal feed URL or upload an .ics file to map events.</div>
 			{:else}
 				<div class="flex-1 divide-y divide-neutral-800 overflow-auto">
 					{#each calendar.events as event (event.id)}
@@ -163,7 +172,7 @@
 								</div>
 								{#if event.coordinates}
 									<button
-										class="shrink-0 bg-blue-500 px-3 py-1 text-xs font-semibold text-white hover:bg-blue-400"
+										class="shrink-0 bg-teal-500 px-3 py-1 text-xs font-semibold text-white hover:bg-teal-400"
 										type="button"
 										onclick={() => (selectedId = selectedId === event.id ? null : event.id)}
 									>
@@ -183,7 +192,7 @@
 							{/if}
 
 							{#if event.url}
-								<a class="mt-3 inline-flex text-sm font-semibold text-blue-300 hover:text-blue-200" href={event.url} target="_blank" rel="noreferrer">
+								<a class="mt-3 inline-flex text-sm font-semibold text-teal-300 hover:text-teal-200" href={event.url} target="_blank" rel="noreferrer">
 									Open source event
 								</a>
 							{/if}
