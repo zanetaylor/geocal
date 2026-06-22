@@ -36,8 +36,8 @@
 	<meta name="description" content="Interactive map of events from an iCal feed or uploaded iCal file." />
 </svelte:head>
 
-<main class="min-h-screen bg-neutral-950 text-neutral-100">
-	<section class="bg-neutral-950 p-5 shadow-2xl shadow-black/20 sm:p-6 lg:p-8">
+<main class="min-h-screen bg-neutral-950 bg-[url($lib/assets/img/cartographer.png)] text-neutral-100">
+	<section class="bg-[#00000060] p-5 shadow-2xl shadow-black/20 sm:p-6 lg:p-8">
 		<div class="mx-auto flex flex-col gap-5">
 			<div>
 				<h1 class="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">geocal</h1>
