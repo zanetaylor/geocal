@@ -6,5 +6,11 @@
 	"assets": {
 		"binding": "ASSETS",
 		"directory": ".svelte-kit/cloudflare"
-	}
+	},
+	"kv_namespaces": [
+		{
+			"binding": "GEOCAL_CACHE",
+			"id": "a03d21e48a5e4fa783ae65df2fed26b9"
+		}
+	]
 }

@@ -7,6 +7,11 @@ const PORTLAND_CENTER: [number, number] = [-122.676483, 45.523064];
 const MAX_RANGE_DAYS = 31;
 const GEOCODE_BATCH_SIZE = 10;
 const MAX_UPLOAD_SIZE = 5 * 1024 * 1024;
+const FEED_CACHE_FRESH_TTL_MS = 5 * 60 * 1000;
+const FEED_CACHE_STALE_TTL_MS = 24 * 60 * 60 * 1000;
+const GEOCODE_FOUND_TTL_SECONDS = 30 * 24 * 60 * 60;
+const GEOCODE_NOT_FOUND_TTL_SECONDS = 7 * 24 * 60 * 60;
+const GEOCODE_ERROR_TTL_SECONDS = 60 * 60;
 
 type ParsedField = { value?: unknown } | string | Date | undefined;
 
@@ -33,9 +38,40 @@ export type CalendarEvent = {
 	coordinates: [number, number] | null;
 };
 
-const geocodeCache = new Map<string, [number, number] | null>();
+type CacheNamespace = {
+	get(key: string): Promise<string | null>;
+	put(key: string, value: string, options?: { expirationTtl?: number }): Promise<void>;
+};
 
-export const load: PageServerLoad = async ({ fetch, url }) => {
+type CacheStore = {
+	namespace?: CacheNamespace;
+};
+
+type MemoryCacheEntry = {
+	value: string;
+	expiresAt: number | null;
+};
+
+type CachedCalendarFeed = {
+	text: string;
+	name: string;
+	cachedAt: number;
+	freshUntil: number;
+	staleUntil: number;
+};
+
+type GeocodeStatus = 'found' | 'not_found' | 'error';
+
+type CachedGeocode = {
+	coordinates: [number, number] | null;
+	status: GeocodeStatus;
+	cachedAt: number;
+};
+
+const memoryCache = new Map<string, MemoryCacheEntry>();
+
+export const load: PageServerLoad = async ({ fetch, platform, url }) => {
+	const cache = createCache(platform?.env?.GEOCAL_CACHE);
 	const range = getDateRange(url.searchParams);
 	const sourceUrl = readFeedUrlSearchParam(url.searchParams);
 
@@ -44,12 +80,18 @@ export const load: PageServerLoad = async ({ fetch, url }) => {
 	}
 
 	try {
-		const calendarSource = await fetchCalendarFeed(fetch, sourceUrl);
+		const calendarSource = await fetchCalendarFeed(fetch, sourceUrl, cache);
 
-		return await processCalendarText(calendarSource.text, range, {
-			sourceUrl,
-			sourceName: calendarSource.name
-		});
+		return await processCalendarText(
+			calendarSource.text,
+			range,
+			{
+				sourceUrl,
+				sourceName: calendarSource.name
+			},
+			cache,
+			calendarSource.warning ? [calendarSource.warning] : []
+		);
 	} catch (error) {
 		return {
 			...emptyCalendarResult(range),
@@ -61,7 +103,8 @@ export const load: PageServerLoad = async ({ fetch, url }) => {
 };
 
 export const actions: Actions = {
-	default: async ({ fetch, request }) => {
+	default: async ({ fetch, platform, request }) => {
+		const cache = createCache(platform?.env?.GEOCAL_CACHE);
 		const formData = await request.formData();
 		const range = getDateRange(formDataToSearchParams(formData));
 		const sourceUrl = readFormString(formData.get('feedUrl'));
@@ -89,12 +132,18 @@ export const actions: Actions = {
 		try {
 			const calendarSource = hasUpload
 				? await readUploadedCalendar(calendarFile)
-				: await fetchCalendarFeed(fetch, sourceUrl);
+				: await fetchCalendarFeed(fetch, sourceUrl, cache);
 
-			return await processCalendarText(calendarSource.text, range, {
-				sourceUrl,
-				sourceName: calendarSource.name
-			});
+			return await processCalendarText(
+				calendarSource.text,
+				range,
+				{
+					sourceUrl,
+					sourceName: calendarSource.name
+				},
+				cache,
+				readCalendarSourceWarning(calendarSource)
+			);
 		} catch (error) {
 			return {
 				...emptyCalendarResult(range),
@@ -119,23 +168,79 @@ function emptyCalendarResult(range: ReturnType<typeof getDateRange>) {
 	};
 }
 
-async function fetchCalendarFeed(fetch: typeof globalThis.fetch, sourceUrl: string) {
-	const url = parseFeedUrl(sourceUrl);
-	const response = await fetch(url, {
-		headers: {
-			'User-Agent': 'calmap/0.0.1',
-			Accept: 'text/calendar,*/*'
-		}
-	});
-
-	if (!response.ok) {
-		throw new Error(`Calendar feed returned ${response.status}.`);
+function readCalendarSourceWarning(calendarSource: unknown) {
+	if (
+		typeof calendarSource === 'object' &&
+		calendarSource &&
+		'warning' in calendarSource &&
+		typeof calendarSource.warning === 'string'
+	) {
+		return [calendarSource.warning];
 	}
 
-	return {
-		text: await response.text(),
-		name: url.toString()
-	};
+	return [];
+}
+
+async function fetchCalendarFeed(
+	fetch: typeof globalThis.fetch,
+	sourceUrl: string,
+	cache: CacheStore
+) {
+	const url = parseFeedUrl(sourceUrl);
+	const cacheKey = await buildCacheKey('feed:v1:', url.toString());
+	const cachedFeed = await readCacheJson<CachedCalendarFeed>(cache, cacheKey);
+	const now = Date.now();
+
+	if (isCachedCalendarFeed(cachedFeed) && now <= cachedFeed.freshUntil) {
+		return {
+			text: cachedFeed.text,
+			name: cachedFeed.name
+		};
+	}
+
+	try {
+		const response = await fetch(url, {
+			headers: {
+				'User-Agent': 'calmap/0.0.1',
+				Accept: 'text/calendar,*/*'
+			}
+		});
+
+		if (!response.ok) {
+			throw new Error(`Calendar feed returned ${response.status}.`);
+		}
+
+		const calendarFeed = {
+			text: await response.text(),
+			name: url.toString()
+		};
+
+		await writeCacheJson(
+			cache,
+			cacheKey,
+			{
+				...calendarFeed,
+				cachedAt: now,
+				freshUntil: now + FEED_CACHE_FRESH_TTL_MS,
+				staleUntil: now + FEED_CACHE_STALE_TTL_MS
+			},
+			Math.ceil(FEED_CACHE_STALE_TTL_MS / 1000)
+		);
+
+		return calendarFeed;
+	} catch (error) {
+		if (isCachedCalendarFeed(cachedFeed) && now <= cachedFeed.staleUntil) {
+			console.warn('Calendar feed refresh failed; using stale cache.', error);
+
+			return {
+				text: cachedFeed.text,
+				name: cachedFeed.name,
+				warning: 'Using cached calendar data because the feed could not be refreshed.'
+			};
+		}
+
+		throw error;
+	}
 }
 
 async function readUploadedCalendar(calendarFile: File) {
@@ -152,9 +257,11 @@ async function readUploadedCalendar(calendarFile: File) {
 async function processCalendarText(
 	calendarText: string,
 	range: ReturnType<typeof getDateRange>,
-	source: { sourceUrl: string; sourceName: string | null }
+	source: { sourceUrl: string; sourceName: string | null },
+	cache: CacheStore,
+	initialWarnings: string[] = []
 ) {
-	const warnings: string[] = [];
+	const warnings: string[] = [...initialWarnings];
 
 	try {
 		const parsed = ICAL.parseString(calendarText) as { events?: ParsedEvent[] };
@@ -167,7 +274,7 @@ async function processCalendarText(
 
 		if (env.MAPTILER_API_KEY) {
 			config.apiKey = env.MAPTILER_API_KEY;
-			await geocodeEvents(events, warnings);
+			await geocodeEvents(events, warnings, cache);
 		} else {
 			warnings.push('Set MAPTILER_API_KEY to show geocoded map markers.');
 		}
@@ -218,22 +325,37 @@ function normalizeEvent(event: ParsedEvent): CalendarEvent | null {
 	};
 }
 
-async function geocodeEvents(events: CalendarEvent[], warnings: string[]) {
+async function geocodeEvents(events: CalendarEvent[], warnings: string[], cache: CacheStore) {
 	const needsGeocoding = events.filter((event) => event.location && !event.coordinates);
-	const uncachedLocations = Array.from(
+	const geocodedLocations = new Map<string, CachedGeocode>();
+	const locations = Array.from(
 		new Set(
-			needsGeocoding
-				.map((event) => normalizeLocationForGeocoding(event.location))
-				.filter((location) => location && !geocodeCache.has(location))
+			needsGeocoding.map((event) => normalizeLocationForGeocoding(event.location)).filter(Boolean)
 		)
 	);
+	const uncachedLocations: string[] = [];
+
+	for (const location of locations) {
+		const cachedGeocode = await readGeocodeCache(cache, location);
+
+		if (cachedGeocode) {
+			geocodedLocations.set(location, cachedGeocode);
+		} else {
+			uncachedLocations.push(location);
+		}
+	}
 
 	if (uncachedLocations.length) {
 		let failedCount = 0;
 
 		for (let index = 0; index < uncachedLocations.length; index += GEOCODE_BATCH_SIZE) {
 			const locations = uncachedLocations.slice(index, index + GEOCODE_BATCH_SIZE);
-			failedCount += await geocodeLocationBatch(locations);
+			const batchResult = await geocodeLocationBatch(locations, cache);
+
+			failedCount += batchResult.failedCount;
+			batchResult.geocodes.forEach((geocode, location) => {
+				geocodedLocations.set(location, geocode);
+			});
 		}
 
 		if (failedCount > 0) {
@@ -244,22 +366,31 @@ async function geocodeEvents(events: CalendarEvent[], warnings: string[]) {
 	}
 
 	needsGeocoding.forEach((event) => {
-		event.coordinates = geocodeCache.get(normalizeLocationForGeocoding(event.location)) ?? null;
+		event.coordinates =
+			geocodedLocations.get(normalizeLocationForGeocoding(event.location))?.coordinates ?? null;
 	});
 }
 
-async function geocodeLocationBatch(locations: string[]) {
+async function geocodeLocationBatch(locations: string[], cache: CacheStore) {
+	const geocodes = new Map<string, CachedGeocode>();
+
 	try {
 		const results = await geocoding.batch(locations, {
 			country: ['us'],
 			proximity: PORTLAND_CENTER
 		});
 
-		results.forEach((result, index) => {
-			geocodeCache.set(locations[index], coordinatesFromGeocodeResult(result));
-		});
+		await Promise.all(
+			results.map(async (result, index) => {
+				const location = locations[index];
+				const geocode = createCachedGeocode(coordinatesFromGeocodeResult(result));
 
-		return 0;
+				geocodes.set(location, geocode);
+				await writeGeocodeCache(cache, location, geocode);
+			})
+		);
+
+		return { failedCount: 0, geocodes };
 	} catch (error) {
 		console.warn('MapTiler batch geocoding failed; falling back to individual lookups.', error);
 
@@ -271,17 +402,153 @@ async function geocodeLocationBatch(locations: string[]) {
 					country: ['us'],
 					proximity: PORTLAND_CENTER
 				});
+				const geocode = createCachedGeocode(coordinatesFromGeocodeResult(result));
 
-				geocodeCache.set(location, coordinatesFromGeocodeResult(result));
+				geocodes.set(location, geocode);
+				await writeGeocodeCache(cache, location, geocode);
 			} catch (fallbackError) {
 				failedCount += 1;
-				geocodeCache.set(location, null);
+				const geocode = createCachedGeocode(null, 'error');
+
+				geocodes.set(location, geocode);
+				await writeGeocodeCache(cache, location, geocode);
 				console.warn(`MapTiler geocoding failed for "${location}".`, fallbackError);
 			}
 		}
 
-		return failedCount;
+		return { failedCount, geocodes };
 	}
+}
+
+function createCache(namespace?: CacheNamespace): CacheStore {
+	return { namespace };
+}
+
+async function readCacheJson<T>(cache: CacheStore, key: string) {
+	try {
+		const value = cache.namespace ? await cache.namespace.get(key) : readMemoryCache(key);
+
+		return value ? (JSON.parse(value) as T) : null;
+	} catch (error) {
+		console.warn(`Unable to read cache key "${key}".`, error);
+
+		return null;
+	}
+}
+
+async function writeCacheJson(
+	cache: CacheStore,
+	key: string,
+	value: unknown,
+	expirationTtl: number
+) {
+	try {
+		const serialized = JSON.stringify(value);
+
+		if (cache.namespace) {
+			await cache.namespace.put(key, serialized, { expirationTtl });
+		} else {
+			writeMemoryCache(key, serialized, expirationTtl);
+		}
+	} catch (error) {
+		console.warn(`Unable to write cache key "${key}".`, error);
+	}
+}
+
+function readMemoryCache(key: string) {
+	const entry = memoryCache.get(key);
+
+	if (!entry) {
+		return null;
+	}
+
+	if (entry.expiresAt && entry.expiresAt <= Date.now()) {
+		memoryCache.delete(key);
+
+		return null;
+	}
+
+	return entry.value;
+}
+
+function writeMemoryCache(key: string, value: string, expirationTtl: number) {
+	memoryCache.set(key, {
+		value,
+		expiresAt: expirationTtl > 0 ? Date.now() + expirationTtl * 1000 : null
+	});
+}
+
+async function readGeocodeCache(cache: CacheStore, location: string) {
+	const cacheKey = await buildCacheKey('geo:v1:', location);
+	const geocode = await readCacheJson<CachedGeocode>(cache, cacheKey);
+
+	return isFreshCachedGeocode(geocode) ? geocode : null;
+}
+
+async function writeGeocodeCache(cache: CacheStore, location: string, geocode: CachedGeocode) {
+	await writeCacheJson(
+		cache,
+		await buildCacheKey('geo:v1:', location),
+		geocode,
+		geocodeTtl(geocode)
+	);
+}
+
+function createCachedGeocode(
+	coordinates: [number, number] | null,
+	status: GeocodeStatus = coordinates ? 'found' : 'not_found'
+): CachedGeocode {
+	return {
+		coordinates,
+		status,
+		cachedAt: Date.now()
+	};
+}
+
+function geocodeTtl(geocode: CachedGeocode) {
+	if (geocode.status === 'found') return GEOCODE_FOUND_TTL_SECONDS;
+	if (geocode.status === 'not_found') return GEOCODE_NOT_FOUND_TTL_SECONDS;
+
+	return GEOCODE_ERROR_TTL_SECONDS;
+}
+
+function isFreshCachedGeocode(value: CachedGeocode | null): value is CachedGeocode {
+	if (!value || !isCoordinatesOrNull(value.coordinates)) {
+		return false;
+	}
+
+	return value.cachedAt + geocodeTtl(value) * 1000 > Date.now();
+}
+
+function isCachedCalendarFeed(value: CachedCalendarFeed | null): value is CachedCalendarFeed {
+	return Boolean(
+		value &&
+		typeof value.text === 'string' &&
+		typeof value.name === 'string' &&
+		typeof value.cachedAt === 'number' &&
+		typeof value.freshUntil === 'number' &&
+		typeof value.staleUntil === 'number'
+	);
+}
+
+function isCoordinatesOrNull(value: unknown): value is [number, number] | null {
+	return (
+		value === null ||
+		(Array.isArray(value) &&
+			value.length === 2 &&
+			typeof value[0] === 'number' &&
+			typeof value[1] === 'number')
+	);
+}
+
+async function buildCacheKey(prefix: string, value: string) {
+	const bytes = new TextEncoder().encode(value);
+	const digest = await crypto.subtle.digest('SHA-256', bytes);
+	const hash = Array.from(new Uint8Array(digest), (byte) =>
+		byte.toString(16).padStart(2, '0')
+	).join('');
+
+	return `${prefix}${hash}`;
 }
 
 function coordinatesFromGeocodeResult(result: Awaited<ReturnType<typeof geocoding.forward>>) {
