@@ -161,6 +161,7 @@ function emptyCalendarResult(range: ReturnType<typeof getDateRange>) {
 		events: [],
 		startDate: range.startDate,
 		endDate: range.endDate,
+		timeZone: range.timeZone,
 		sourceUrl: '',
 		sourceName: null as string | null,
 		warnings: [] as string[],
@@ -269,7 +270,7 @@ async function processCalendarText(
 			.map(normalizeEvent)
 			.filter((event): event is CalendarEvent => Boolean(event))
 			.filter((event) => event.status !== 'CANCELLED')
-			.filter((event) => eventInRange(event, range.start, range.end))
+			.filter((event) => eventInRange(event, range))
 			.sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
 
 		if (env.MAPTILER_API_KEY) {
@@ -283,6 +284,7 @@ async function processCalendarText(
 			events,
 			startDate: range.startDate,
 			endDate: range.endDate,
+			timeZone: range.timeZone,
 			sourceUrl: source.sourceUrl,
 			sourceName: source.sourceName,
 			warnings,
@@ -293,6 +295,7 @@ async function processCalendarText(
 			events: [],
 			startDate: range.startDate,
 			endDate: range.endDate,
+			timeZone: range.timeZone,
 			sourceUrl: source.sourceUrl,
 			sourceName: source.sourceName,
 			warnings: [error instanceof Error ? error.message : 'Unable to parse calendar.'],
@@ -561,7 +564,8 @@ function coordinatesFromGeocodeResult(result: Awaited<ReturnType<typeof geocodin
 }
 
 function getDateRange(searchParams: URLSearchParams) {
-	const today = toDateInputValue(new Date());
+	const timeZone = readTimeZone(searchParams) ?? 'UTC';
+	const today = toDateInputValue(new Date(), timeZone);
 	const defaultEnd = addDays(today, 7);
 	const requestedStart = searchParams.get('start');
 	const requestedEnd = searchParams.get('end');
@@ -579,8 +583,7 @@ function getDateRange(searchParams: URLSearchParams) {
 	return {
 		startDate,
 		endDate,
-		start: new Date(`${startDate}T00:00:00`),
-		end: new Date(`${endDate}T23:59:59.999`)
+		timeZone
 	};
 }
 
@@ -588,9 +591,11 @@ function formDataToSearchParams(formData: FormData) {
 	const searchParams = new URLSearchParams();
 	const start = readFormString(formData.get('start'));
 	const end = readFormString(formData.get('end'));
+	const timeZone = readFormString(formData.get('timeZone'));
 
 	if (start) searchParams.set('start', start);
 	if (end) searchParams.set('end', end);
+	if (timeZone) searchParams.set('timeZone', timeZone);
 
 	return searchParams;
 }
@@ -627,10 +632,10 @@ function readFeedUrlSearchParam(searchParams: URLSearchParams) {
 	return '';
 }
 
-function eventInRange(event: CalendarEvent, start: Date, end: Date) {
-	const eventStart = new Date(event.start);
+function eventInRange(event: CalendarEvent, range: ReturnType<typeof getDateRange>) {
+	const eventStartDate = toDateInputValue(new Date(event.start), range.timeZone);
 
-	return eventStart >= start && eventStart <= end;
+	return eventStartDate >= range.startDate && eventStartDate <= range.endDate;
 }
 
 function readString(field: ParsedField) {
@@ -686,8 +691,33 @@ function isDateInputValue(value: string | null): value is string {
 	return Boolean(value?.match(/^\d{4}-\d{2}-\d{2}$/));
 }
 
-function toDateInputValue(date: Date) {
-	return date.toISOString().slice(0, 10);
+function readTimeZone(searchParams: URLSearchParams) {
+	const timeZone = searchParams.get('timeZone') || searchParams.get('tz');
+
+	if (!timeZone) {
+		return null;
+	}
+
+	try {
+		new Intl.DateTimeFormat('en-US', { timeZone }).format(new Date());
+		return timeZone;
+	} catch {
+		return null;
+	}
+}
+
+function toDateInputValue(date: Date, timeZone = 'UTC') {
+	const parts = new Intl.DateTimeFormat('en-US', {
+		timeZone,
+		year: 'numeric',
+		month: '2-digit',
+		day: '2-digit'
+	}).formatToParts(date);
+	const year = parts.find((part) => part.type === 'year')?.value;
+	const month = parts.find((part) => part.type === 'month')?.value;
+	const day = parts.find((part) => part.type === 'day')?.value;
+
+	return year && month && day ? `${year}-${month}-${day}` : date.toISOString().slice(0, 10);
 }
 
 function addDays(dateInputValue: string, days: number) {

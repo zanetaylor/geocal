@@ -1,16 +1,18 @@
 <script lang="ts">
 	import type { PageProps } from './$types';
+	import { onMount } from 'svelte';
 	import { MapLibre, Marker, NavigationControl, Popup, ScaleControl } from 'svelte-maplibre-gl';
 
 	let { data, form }: PageProps = $props();
 	let selectedId = $state<string | null>(null);
 	let sourceMode = $state<'url' | 'file'>('url');
+	let timeZone = $state('UTC');
 	let calendar = $derived(form ?? data);
 
 	let mappedEvents = $derived(calendar.events.filter((event) => event.coordinates));
 	let unmappedCount = $derived(calendar.events.length - mappedEvents.length);
 	let eventSummary = $derived(
-		`${mappedEvents.length} mapped / ${calendar.events.length} events from ${formatDateOnly(calendar.startDate)} and ${formatDateOnly(calendar.endDate)}${
+		`${mappedEvents.length} mapped / ${calendar.events.length} events from ${formatDateOnly(calendar.startDate)} to ${formatDateOnly(calendar.endDate)}${
 			unmappedCount > 0 ? ` - ${unmappedCount} not mapped` : ''
 		}`
 	);
@@ -39,6 +41,10 @@
 	function descriptionPreview(value: string) {
 		return value.length > 220 ? `${value.slice(0, 220).trim()}...` : value;
 	}
+
+	onMount(() => {
+		timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || timeZone;
+	});
 </script>
 
 <svelte:head>
@@ -66,6 +72,7 @@
 				enctype="multipart/form-data"
 				class="grid w-full grid-cols-1 items-end gap-3 sm:grid-cols-2 lg:grid-cols-[auto_minmax(14rem,2fr)_minmax(9rem,0.8fr)_minmax(9rem,0.8fr)_auto]"
 			>
+				<input type="hidden" name="timeZone" value={timeZone} />
 				<div class="grid gap-1.5 text-sm font-medium text-neutral-200">
 					<span>Source</span>
 					<div class="flex h-12 overflow-hidden rounded-xs bg-neutral-800 p-1 sm:h-11">
@@ -110,7 +117,7 @@
 					>
 						<span>ICS file</span>
 						<input
-							class="h-12 min-w-0 rounded-xs bg-neutral-800 px-3 text-sm text-neutral-100 outline-none file:mr-3 file:h-9 file:rounded-xs file:border-0 file:bg-teal-500 file:px-3 file:font-semibold file:text-white file:hover:bg-teal-400 sm:h-11 sm:file:h-8"
+							class="h-12 min-w-0 rounded-xs bg-neutral-800 px-3 text-sm text-neutral-100 outline-none file:mr-3 file:h-9 file:rounded-xs file:border-0 file:bg-teal-500 file:px-3 file:font-semibold file:text-neutral-950 file:hover:bg-teal-400 sm:h-11 sm:file:h-8"
 							type="file"
 							name="calendarFile"
 							accept=".ics,text/calendar"
@@ -136,7 +143,7 @@
 					/>
 				</label>
 				<button
-					class="h-12 rounded-xs bg-teal-500 px-4 font-semibold text-white shadow-[inset_0_-4px_0_rgba(0,0,0,0.22)] transition cursor-pointer hover:bg-teal-400 sm:col-span-2 sm:h-11 lg:col-span-1"
+					class="h-12 rounded-xs bg-teal-500 px-4 font-semibold text-neutral-950 shadow-[inset_0_-4px_0_rgba(0,0,0,0.22)] transition cursor-pointer hover:bg-teal-400 sm:col-span-2 sm:h-11 lg:col-span-1"
 					type="submit"
 				>
 					Go!
@@ -162,12 +169,12 @@
 					<Marker lnglat={event.coordinates}>
 						{#snippet content()}
 							<button
-								class="grid h-8 w-8 place-items-center bg-teal-500 text-sm font-black text-white shadow-lg shadow-neutral-950/40 transition hover:scale-110"
+								class="h-6 w-6 rounded-full bg-teal-500 transition hover:scale-110"
 								type="button"
 								title={event.title}
+								aria-label={event.title}
 								onclick={() => (selectedId = selectedId === event.id ? null : event.id)}
 							>
-								•
 							</button>
 						{/snippet}
 					</Marker>
@@ -231,7 +238,7 @@
 								</div>
 								{#if event.coordinates}
 									<button
-										class="shrink-0 bg-teal-500 px-3 py-1 text-xs font-semibold text-white hover:bg-teal-400"
+										class="shrink-0 bg-teal-500 px-3 py-1 text-xs font-semibold text-neutral-950 rounded-xs cursor-pointer hover:bg-teal-400"
 										type="button"
 										onclick={() => (selectedId = selectedId === event.id ? null : event.id)}
 									>
@@ -261,7 +268,7 @@
 									target="_blank"
 									rel="noreferrer"
 								>
-									Open source event
+									Details
 								</a>
 							{/if}
 						</article>
