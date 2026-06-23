@@ -4,11 +4,7 @@ import { defineConfig } from 'vite';
 
 export default defineConfig({
 	plugins: [tailwindcss(), sveltekit()],
-	optimizeDeps: {
-		esbuildOptions: {
-			target: 'esnext'
-		}
-	},
+	optimizeDeps: {},
 	build: {
 		target: 'esnext' // browsers can handle the latest ES features
 	},
