@@ -4,6 +4,7 @@
 
 	let { data, form }: PageProps = $props();
 	let selectedId = $state<string | null>(null);
+	let sourceMode = $state<'url' | 'file'>('url');
 	let calendar = $derived(form ?? data);
 
 	let mappedEvents = $derived(calendar.events.filter((event) => event.coordinates));
@@ -41,70 +42,112 @@
 </script>
 
 <svelte:head>
-	<title>geocal - a map of events</title>
-	<meta name="description" content="Interactive map of events from an iCal feed or uploaded iCal file." />
+	<title>geocal - calendar → map</title>
+	<meta
+		name="description"
+		content="Interactive map of events from an iCal feed or uploaded iCal file."
+	/>
 </svelte:head>
 
-<main class="min-h-screen bg-neutral-950 bg-[url($lib/assets/img/cartographer.png)] text-neutral-100">
-	<section class="bg-[#00000060] p-5 shadow-2xl shadow-black/20 sm:p-6 lg:p-8">
-		<div class="mx-auto flex flex-col gap-5">
+<main
+	class="min-h-screen bg-neutral-950 bg-[url($lib/assets/img/cartographer.png)] text-neutral-100"
+>
+	<section class="bg-[#00000060] px-4 py-5 shadow-2xl shadow-black/20 sm:p-6 lg:p-8">
+		<div class="mx-auto flex max-w-screen-2xl flex-col gap-5">
 			<div>
 				<h1 class="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">geocal</h1>
 				<p class="mt-2 max-w-2xl text-sm text-neutral-300">
-					Enter a public ICS feed URL or upload an .ics file to see the events on the map.
+					Enter a public ICS feed URL or upload an .ics file to plot the events on the map.
 				</p>
 			</div>
 
 			<form
 				method="POST"
 				enctype="multipart/form-data"
-				class="grid w-full grid-cols-[minmax(14rem,2fr)_minmax(12rem,1.5fr)_minmax(9rem,0.8fr)_minmax(9rem,0.8fr)_auto] items-end gap-3 overflow-x-auto"
+				class="grid w-full grid-cols-1 items-end gap-3 sm:grid-cols-2 lg:grid-cols-[auto_minmax(14rem,2fr)_minmax(9rem,0.8fr)_minmax(9rem,0.8fr)_auto]"
 			>
-				<label class="grid gap-1 text-sm font-medium text-neutral-200">
-					<span>Public ICS feed URL</span>
-					<input
-						class="h-11 min-w-0 rounded-xs bg-neutral-800 px-3 text-neutral-100 outline-none ring-teal-300/40 transition placeholder:text-neutral-500 focus:ring-4"
-						type="url"
-						name="feedUrl"
-						value={calendar.sourceUrl}
-						placeholder="https://example.com/calendar.ics"
-					/>
-				</label>
-				<label class="grid gap-1 text-sm font-medium text-neutral-200">
-					<span>ICS file</span>
-					<input
-						class="h-11 min-w-0 rounded-xs bg-neutral-800 px-3 text-sm text-neutral-100 outline-none file:mr-3 file:h-8 file:rounded-xs file:border-0 file:bg-teal-500 file:px-3 file:font-semibold file:text-white file:hover:bg-teal-400"
-						type="file"
-						name="calendarFile"
-						accept=".ics,text/calendar"
-					/>
-				</label>
-				<label class="grid gap-1 text-sm font-medium text-neutral-200">
+				<div class="grid gap-1.5 text-sm font-medium text-neutral-200">
+					<span>Source</span>
+					<div class="flex h-12 overflow-hidden rounded-xs bg-neutral-800 p-1 sm:h-11">
+						<button
+							class={`flex-1 px-4 text-sm font-semibold transition cursor-pointer ${sourceMode === 'url'
+								? 'bg-neutral-700 text-teal-500'
+								: 'bg-transparent text-neutral-200 hover:text-teal-500'}`}
+							type="button"
+							onclick={() => (sourceMode = 'url')}
+							aria-pressed={sourceMode === 'url'}
+						>
+							URL
+						</button>
+						<button
+							class={`flex-1 px-4 text-sm font-semibold transition cursor-pointer ${sourceMode === 'file'
+							    ? 'bg-neutral-700 text-teal-500'
+								: 'bg-transparent text-neutral-200 hover:text-teal-500'}`}
+							type="button"
+							onclick={() => (sourceMode = 'file')}
+							aria-pressed={sourceMode === 'file'}
+						>
+							File
+						</button>
+					</div>
+				</div>
+				{#if sourceMode === 'url'}
+					<label
+						class="grid gap-1.5 text-sm font-medium text-neutral-200 sm:col-span-2 lg:col-span-1"
+					>
+						<span>Public ICS feed URL</span>
+						<input
+							class="h-12 min-w-0 rounded-xs bg-neutral-800 px-3 text-base text-neutral-100 ring-teal-300/40 transition outline-none placeholder:text-neutral-500 focus:ring-4 sm:h-11 sm:text-sm"
+							type="url"
+							name="feedUrl"
+							value={calendar.sourceUrl}
+							placeholder="https://example.com/calendar.ics"
+						/>
+					</label>
+				{:else}
+					<label
+						class="grid gap-1.5 text-sm font-medium text-neutral-200 sm:col-span-2 lg:col-span-1"
+					>
+						<span>ICS file</span>
+						<input
+							class="h-12 min-w-0 rounded-xs bg-neutral-800 px-3 text-sm text-neutral-100 outline-none file:mr-3 file:h-9 file:rounded-xs file:border-0 file:bg-teal-500 file:px-3 file:font-semibold file:text-white file:hover:bg-teal-400 sm:h-11 sm:file:h-8"
+							type="file"
+							name="calendarFile"
+							accept=".ics,text/calendar"
+						/>
+					</label>
+				{/if}
+				<label class="grid gap-1.5 text-sm font-medium text-neutral-200">
 					<span>Start</span>
 					<input
-						class="h-11 rounded-xs bg-neutral-800 px-3 text-neutral-100 outline-none ring-teal-300/40 transition focus:ring-4"
+						class="h-12 min-w-0 rounded-xs bg-neutral-800 px-3 text-base text-neutral-100 ring-teal-300/40 transition outline-none focus:ring-4 sm:h-11 sm:text-sm"
 						type="date"
 						name="start"
 						value={calendar.startDate}
 					/>
 				</label>
-				<label class="grid gap-1 text-sm font-medium text-neutral-200">
+				<label class="grid gap-1.5 text-sm font-medium text-neutral-200">
 					<span>End</span>
 					<input
-						class="h-11 rounded-xs bg-neutral-800 px-3 text-neutral-100 outline-none ring-teal-300/40 transition focus:ring-4"
+						class="h-12 min-w-0 rounded-xs bg-neutral-800 px-3 text-base text-neutral-100 ring-teal-300/40 transition outline-none focus:ring-4 sm:h-11 sm:text-sm"
 						type="date"
 						name="end"
 						value={calendar.endDate}
 					/>
 				</label>
-				<button class="h-11 rounded-xs bg-teal-500 px-4 font-semibold text-white transition hover:bg-teal-400" type="submit">
-				Go!
+				<button
+					class="h-12 rounded-xs bg-teal-500 px-4 font-semibold text-white shadow-[inset_0_-4px_0_rgba(0,0,0,0.22)] transition cursor-pointer hover:bg-teal-400 sm:col-span-2 sm:h-11 lg:col-span-1"
+					type="submit"
+				>
+					Go!
 				</button>
 			</form>
 		</div>
 	</section>
 
-	<section class="relative h-[calc(100vh-268px)] min-h-[620px] overflow-hidden bg-neutral-900 shadow-2xl shadow-black/30">
+	<section
+		class="relative h-[68vh] min-h-[540px] overflow-hidden bg-neutral-900 shadow-2xl shadow-black/30 sm:h-[calc(100vh-268px)] sm:min-h-[620px]"
+	>
 		<div class="absolute inset-0">
 			<MapLibre
 				class="h-full w-full"
@@ -113,7 +156,7 @@
 				center={{ lng: -122.676483, lat: 45.523064 }}
 			>
 				<NavigationControl />
-				<ScaleControl  />
+				<ScaleControl />
 
 				{#each mappedEvents as event (event.id)}
 					<Marker lnglat={event.coordinates}>
@@ -129,13 +172,23 @@
 						{/snippet}
 					</Marker>
 
-					<Popup lnglat={event.coordinates} open={selectedId === event.id} offset={24} class="max-w-xs text-neutral-950">
+					<Popup
+						lnglat={event.coordinates}
+						open={selectedId === event.id}
+						offset={24}
+						class="max-w-xs text-neutral-950"
+					>
 						<div class="space-y-2 p-1">
-							<h3 class="font-semibold leading-tight">{event.title}</h3>
+							<h3 class="leading-tight font-semibold">{event.title}</h3>
 							<p class="text-sm text-neutral-600">{formatDate(event.start)}</p>
 							<p class="text-sm">{event.location}</p>
 							{#if event.url}
-								<a class="text-sm font-semibold text-teal-700 underline" href={event.url} target="_blank" rel="noreferrer">Source event</a>
+								<a
+									class="text-sm font-semibold text-teal-700 underline"
+									href={event.url}
+									target="_blank"
+									rel="noreferrer">Source event</a
+								>
 							{/if}
 						</div>
 					</Popup>
@@ -143,9 +196,11 @@
 			</MapLibre>
 		</div>
 
-		<aside class="absolute inset-x-3 bottom-3 z-10 flex max-h-[48%] flex-col overflow-hidden rounded-xs bg-neutral-950/85 backdrop-blur sm:inset-x-4 sm:bottom-4 lg:inset-x-auto lg:inset-y-8 lg:left-8 lg:w-[420px] lg:max-h-none">
-			<div class="p-4">
-				<h2 class="text-xl font-semibold">Events</h2>
+		<aside
+			class="absolute inset-x-2 bottom-2 z-10 flex max-h-[45%] flex-col overflow-hidden rounded-xs bg-neutral-950/85 backdrop-blur sm:inset-x-4 sm:bottom-4 sm:max-h-[48%] lg:inset-x-auto lg:inset-y-8 lg:left-8 lg:max-h-none lg:w-[420px]"
+		>
+			<div class="p-3 sm:p-4">
+				<h2 class="text-lg font-semibold sm:text-xl">Events</h2>
 				<p class="mt-1 text-sm text-neutral-400">{eventSummary}</p>
 			</div>
 
@@ -160,14 +215,18 @@
 			{#if calendar.feedError}
 				<div class="p-6 text-neutral-300">The calendar could not be loaded.</div>
 			{:else if calendar.events.length === 0}
-				<div class="p-3 bg-red-800 text-neutral-300 text-sm">Load an iCal feed URL or upload an .ics file to map events.</div>
+				<div class="bg-red-800 p-3 text-sm text-neutral-300">
+					Load feed URL or upload a file to map events.
+				</div>
 			{:else}
 				<div class="flex-1 divide-y divide-neutral-800 overflow-auto">
 					{#each calendar.events as event (event.id)}
-						<article class={`p-4 transition hover:bg-neutral-800/60 ${selectedId === event.id ? 'bg-neutral-800' : ''}`}>
+						<article
+							class={`p-4 transition hover:bg-neutral-800/60 ${selectedId === event.id ? 'bg-neutral-800' : ''}`}
+						>
 							<div class="flex items-start justify-between gap-3">
 								<div>
-									<h3 class="font-semibold leading-tight">{event.title}</h3>
+									<h3 class="leading-tight font-semibold">{event.title}</h3>
 									<p class="mt-1 text-sm text-neutral-300">{formatDate(event.start)}</p>
 								</div>
 								{#if event.coordinates}
@@ -179,7 +238,9 @@
 										Map
 									</button>
 								{:else}
-									<span class="shrink-0 bg-neutral-800 px-3 py-1 text-xs text-neutral-400">Unmapped</span>
+									<span class="shrink-0 bg-neutral-800 px-3 py-1 text-xs text-neutral-400"
+										>Unmapped</span
+									>
 								{/if}
 							</div>
 
@@ -188,11 +249,18 @@
 							{/if}
 
 							{#if event.description}
-								<p class="mt-2 text-sm leading-6 text-neutral-400">{descriptionPreview(event.description)}</p>
+								<p class="mt-2 text-sm leading-6 text-neutral-400">
+									{descriptionPreview(event.description)}
+								</p>
 							{/if}
 
 							{#if event.url}
-								<a class="mt-3 inline-flex text-sm font-semibold text-teal-300 hover:text-teal-200" href={event.url} target="_blank" rel="noreferrer">
+								<a
+									class="mt-3 inline-flex text-sm font-semibold text-teal-300 hover:text-teal-200"
+									href={event.url}
+									target="_blank"
+									rel="noreferrer"
+								>
 									Open source event
 								</a>
 							{/if}

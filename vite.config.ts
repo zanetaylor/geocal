@@ -5,11 +5,14 @@ import { defineConfig } from 'vite';
 export default defineConfig({
 	plugins: [tailwindcss(), sveltekit()],
 	optimizeDeps: {
-    esbuildOptions: {
-      target: 'esnext'
-    }
-  },
+		esbuildOptions: {
+			target: 'esnext'
+		}
+	},
 	build: {
-    target: 'esnext' // browsers can handle the latest ES features
-  }
+		target: 'esnext' // browsers can handle the latest ES features
+	},
+	server: {
+		allowedHosts: ['localhost', '127.0.0.1', 'osgiliath']
+	}
 });
