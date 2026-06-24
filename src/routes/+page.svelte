@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { PageProps } from './$types';
+	import { Copy, Link, MapPin, Upload } from '@lucide/svelte';
 	import { onMount } from 'svelte';
 	import { MapLibre, Marker, NavigationControl, Popup, ScaleControl } from 'svelte-maplibre-gl';
 
@@ -118,23 +119,25 @@
 					<span>Source</span>
 					<div class="flex h-12 overflow-hidden rounded-xs bg-neutral-800 p-1 sm:h-11">
 						<button
-							class={`flex-1 px-4 text-sm font-semibold transition cursor-pointer ${sourceMode === 'url'
+							class={`flex flex-1 items-center justify-center gap-2 px-4 text-sm font-semibold transition cursor-pointer ${sourceMode === 'url'
 								? 'bg-neutral-700 text-teal-500'
 								: 'bg-transparent text-neutral-200 hover:text-teal-500'}`}
 							type="button"
 							onclick={() => (sourceMode = 'url')}
 							aria-pressed={sourceMode === 'url'}
 						>
+							<Link class="h-4 w-4" aria-hidden="true" />
 							URL
 						</button>
 						<button
-							class={`flex-1 px-4 text-sm font-semibold transition cursor-pointer ${sourceMode === 'file'
+							class={`flex flex-1 items-center justify-center gap-2 px-4 text-sm font-semibold transition cursor-pointer ${sourceMode === 'file'
 							    ? 'bg-neutral-700 text-teal-500'
 								: 'bg-transparent text-neutral-200 hover:text-teal-500'}`}
 							type="button"
 							onclick={() => (sourceMode = 'file')}
 							aria-pressed={sourceMode === 'file'}
 						>
+							<Upload class="h-4 w-4" aria-hidden="true" />
 							File
 						</button>
 					</div>
@@ -165,24 +168,26 @@
 						/>
 					</label>
 				{/if}
-				<label class="grid gap-1.5 text-sm font-medium text-neutral-200">
-					<span>Start</span>
-					<input
-						class="h-12 min-w-0 rounded-xs bg-neutral-800 px-3 text-base text-neutral-100 ring-teal-300/40 transition outline-none focus:ring-4 sm:h-11 sm:text-sm"
-						type="date"
-						name="start"
-						value={calendar.startDate}
-					/>
-				</label>
-				<label class="grid gap-1.5 text-sm font-medium text-neutral-200">
-					<span>End</span>
-					<input
-						class="h-12 min-w-0 rounded-xs bg-neutral-800 px-3 text-base text-neutral-100 ring-teal-300/40 transition outline-none focus:ring-4 sm:h-11 sm:text-sm"
-						type="date"
-						name="end"
-						value={calendar.endDate}
-					/>
-				</label>
+				<div class="grid grid-cols-2 gap-3 sm:contents">
+					<label class="grid gap-1.5 text-sm font-medium text-neutral-200">
+						<span>Start</span>
+						<input
+							class="h-12 min-w-0 rounded-xs bg-neutral-800 px-3 text-base text-neutral-100 ring-teal-300/40 transition outline-none focus:ring-4 sm:h-11 sm:text-sm"
+							type="date"
+							name="start"
+							value={calendar.startDate}
+						/>
+					</label>
+					<label class="grid gap-1.5 text-sm font-medium text-neutral-200">
+						<span>End</span>
+						<input
+							class="h-12 min-w-0 rounded-xs bg-neutral-800 px-3 text-base text-neutral-100 ring-teal-300/40 transition outline-none focus:ring-4 sm:h-11 sm:text-sm"
+							type="date"
+							name="end"
+							value={calendar.endDate}
+						/>
+					</label>
+				</div>
 				<div class="flex gap-3 sm:col-span-2 lg:col-span-2">
 					<button
 						class="h-12 flex-1 rounded-xs bg-teal-500 px-4 font-semibold text-neutral-950 shadow-[inset_0_-4px_0_rgba(0,0,0,0.22)] transition cursor-pointer hover:bg-teal-400 sm:h-11"
@@ -191,15 +196,32 @@
 						Go!
 					</button>
 					<button
-						class={`h-12 flex-1 rounded-xs px-4 font-semibold transition sm:h-11 ${canCopyLink
+						class={`flex h-12 w-12 items-center justify-center rounded-xs font-semibold transition sm:h-11 sm:w-11 ${canCopyLink
 							? 'cursor-pointer bg-neutral-800 text-teal-300 shadow-[inset_0_-4px_0_rgba(0,0,0,0.22)] hover:bg-neutral-700 hover:text-teal-200'
 							: 'cursor-not-allowed bg-neutral-900 text-neutral-600'}`}
 						type="button"
 						disabled={!canCopyLink}
 						onclick={copyShareLink}
-						title={canCopyLink ? 'Copy a link that reloads this feed' : 'Load a feed URL to copy a link'}
+						aria-label={
+							copyStatus === 'copied'
+								? 'Link copied'
+								: copyStatus === 'error'
+									? 'Copy failed'
+									: canCopyLink
+										? 'Copy link'
+										: 'Load a feed URL to copy a link'
+						}
+						title={
+							copyStatus === 'copied'
+								? 'Link copied'
+								: copyStatus === 'error'
+									? 'Copy failed'
+									: canCopyLink
+										? 'Copy link'
+										: 'Load a feed URL to copy a link'
+						}
 					>
-						{copyStatus === 'copied' ? 'Copied!' : copyStatus === 'error' ? 'Copy failed' : 'Copy link'}
+						<Copy class="h-4 w-4" aria-hidden="true" />
 					</button>
 				</div>
 			</form>
@@ -223,12 +245,13 @@
 					<Marker lnglat={event.coordinates}>
 						{#snippet content()}
 							<button
-								class="h-6 w-6 rounded-full bg-teal-500 transition hover:scale-110"
+								class="flex h-7 w-7 items-center justify-center rounded-full bg-teal-500 text-neutral-950 ring-2 ring-teal-100/65 transition hover:scale-110"
 								type="button"
 								title={event.title}
 								aria-label={event.title}
 								onclick={() => (selectedId = selectedId === event.id ? null : event.id)}
 							>
+								<MapPin class="h-4 w-4" aria-hidden="true" />
 							</button>
 						{/snippet}
 					</Marker>
@@ -292,11 +315,13 @@
 								</div>
 								{#if event.coordinates}
 									<button
-										class="shrink-0 bg-teal-500 px-3 py-1 text-xs font-semibold text-neutral-950 rounded-xs shadow-[inset_0_-4px_0_rgba(0,0,0,0.22)] cursor-pointer hover:bg-teal-400"
+										class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xs bg-teal-500 text-neutral-950 shadow-[inset_0_-4px_0_rgba(0,0,0,0.22)] transition cursor-pointer hover:bg-teal-400"
 										type="button"
+										aria-label={`Show ${event.title} on map`}
+										title="Show on map"
 										onclick={() => (selectedId = selectedId === event.id ? null : event.id)}
 									>
-										Map
+										<MapPin class="h-4 w-4" aria-hidden="true" />
 									</button>
 								{:else}
 									<span class="shrink-0 bg-neutral-800 px-3 py-1 text-xs text-neutral-400"

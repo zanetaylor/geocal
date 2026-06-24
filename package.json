@@ -14,6 +14,7 @@
 		"lint": "prettier --check ."
 	},
 	"devDependencies": {
+		"@lucide/svelte": "^1.21.0",
 		"@maptiler/client": "^3.0.2",
 		"@sveltejs/adapter-cloudflare": "^7.2.9",
 		"@sveltejs/kit": "^2.16.0",
