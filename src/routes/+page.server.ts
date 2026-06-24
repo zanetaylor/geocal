@@ -632,6 +632,10 @@ function readFeedUrlSearchParam(searchParams: URLSearchParams) {
 	return '';
 }
 
+function isDateInputValue(value: string | null): value is string {
+	return Boolean(value?.match(/^\d{4}-\d{2}-\d{2}$/));
+}
+
 function eventInRange(event: CalendarEvent, range: ReturnType<typeof getDateRange>) {
 	const eventStartDate = toDateInputValue(new Date(event.start), range.timeZone);
 
@@ -685,10 +689,6 @@ function extractCoordinates(location: string): [number, number] | null {
 	}
 
 	return [lng, lat];
-}
-
-function isDateInputValue(value: string | null): value is string {
-	return Boolean(value?.match(/^\d{4}-\d{2}-\d{2}$/));
 }
 
 function readTimeZone(searchParams: URLSearchParams) {

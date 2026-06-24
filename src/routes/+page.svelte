@@ -23,12 +23,12 @@
 	const dateFormatter = new Intl.DateTimeFormat('en-US', {
 		month: 'numeric',
 		day: 'numeric',
-		year: 'numeric'
+		year: '2-digit'
 	});
 	const dateTimeFormatter = new Intl.DateTimeFormat('en-US', {
 		month: 'numeric',
 		day: 'numeric',
-		year: 'numeric',
+		year: '2-digit',
 		hour: 'numeric',
 		minute: '2-digit'
 	});
@@ -105,7 +105,8 @@
 			<div>
 				<h1 class="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">geocal</h1>
 				<p class="mt-2 max-w-2xl text-sm text-neutral-300">
-					Enter a public ICS feed URL or upload an .ics file to plot the events on the map.
+					Enter a public ICS feed URL or upload an .ics file and select a date range to plot the
+					events on the map.
 				</p>
 			</div>
 
@@ -119,9 +120,11 @@
 					<span>Source</span>
 					<div class="flex h-12 overflow-hidden rounded-xs bg-neutral-800 p-1 sm:h-11">
 						<button
-							class={`flex flex-1 items-center justify-center gap-2 px-4 text-sm font-semibold transition cursor-pointer ${sourceMode === 'url'
-								? 'bg-neutral-700 text-teal-500'
-								: 'bg-transparent text-neutral-200 hover:text-teal-500'}`}
+							class={`flex flex-1 cursor-pointer items-center justify-center gap-2 px-4 text-sm font-semibold transition ${
+								sourceMode === 'url'
+									? 'bg-neutral-700 text-teal-500'
+									: 'bg-transparent text-neutral-200 hover:text-teal-500'
+							}`}
 							type="button"
 							onclick={() => (sourceMode = 'url')}
 							aria-pressed={sourceMode === 'url'}
@@ -130,9 +133,11 @@
 							URL
 						</button>
 						<button
-							class={`flex flex-1 items-center justify-center gap-2 px-4 text-sm font-semibold transition cursor-pointer ${sourceMode === 'file'
-							    ? 'bg-neutral-700 text-teal-500'
-								: 'bg-transparent text-neutral-200 hover:text-teal-500'}`}
+							class={`flex flex-1 cursor-pointer items-center justify-center gap-2 px-4 text-sm font-semibold transition ${
+								sourceMode === 'file'
+									? 'bg-neutral-700 text-teal-500'
+									: 'bg-transparent text-neutral-200 hover:text-teal-500'
+							}`}
 							type="button"
 							onclick={() => (sourceMode = 'file')}
 							aria-pressed={sourceMode === 'file'}
@@ -190,36 +195,34 @@
 				</div>
 				<div class="flex gap-3 sm:col-span-2 lg:col-span-2">
 					<button
-						class="h-12 flex-1 rounded-xs bg-teal-500 px-4 font-semibold text-neutral-950 shadow-[inset_0_-4px_0_rgba(0,0,0,0.22)] transition cursor-pointer hover:bg-teal-400 sm:h-11"
+						class="h-12 flex-1 cursor-pointer rounded-xs bg-teal-500 px-4 font-semibold text-neutral-950 shadow-[inset_0_-4px_0_rgba(0,0,0,0.22)] transition hover:bg-teal-400 sm:h-11"
 						type="submit"
 					>
 						Go!
 					</button>
 					<button
-						class={`flex h-12 w-12 items-center justify-center rounded-xs font-semibold transition sm:h-11 sm:w-11 ${canCopyLink
-							? 'cursor-pointer bg-neutral-800 text-teal-300 shadow-[inset_0_-4px_0_rgba(0,0,0,0.22)] hover:bg-neutral-700 hover:text-teal-200'
-							: 'cursor-not-allowed bg-neutral-900 text-neutral-600'}`}
+						class={`flex h-12 w-12 items-center justify-center rounded-xs font-semibold transition sm:h-11 sm:w-11 ${
+							canCopyLink
+								? 'cursor-pointer bg-neutral-800 text-teal-300 shadow-[inset_0_-4px_0_rgba(0,0,0,0.22)] hover:bg-neutral-700 hover:text-teal-200'
+								: 'cursor-not-allowed bg-neutral-900 text-neutral-600'
+						}`}
 						type="button"
 						disabled={!canCopyLink}
 						onclick={copyShareLink}
-						aria-label={
-							copyStatus === 'copied'
-								? 'Link copied'
-								: copyStatus === 'error'
-									? 'Copy failed'
-									: canCopyLink
-										? 'Copy link'
-										: 'Load a feed URL to copy a link'
-						}
-						title={
-							copyStatus === 'copied'
-								? 'Link copied'
-								: copyStatus === 'error'
-									? 'Copy failed'
-									: canCopyLink
-										? 'Copy link'
-										: 'Load a feed URL to copy a link'
-						}
+						aria-label={copyStatus === 'copied'
+							? 'Link copied'
+							: copyStatus === 'error'
+								? 'Copy failed'
+								: canCopyLink
+									? 'Copy link'
+									: 'Load a feed URL to copy a link'}
+						title={copyStatus === 'copied'
+							? 'Link copied'
+							: copyStatus === 'error'
+								? 'Copy failed'
+								: canCopyLink
+									? 'Copy link'
+									: 'Load a feed URL to copy a link'}
 					>
 						<Copy class="h-4 w-4" aria-hidden="true" />
 					</button>
@@ -315,7 +318,7 @@
 								</div>
 								{#if event.coordinates}
 									<button
-										class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xs bg-teal-500 text-neutral-950 shadow-[inset_0_-4px_0_rgba(0,0,0,0.22)] transition cursor-pointer hover:bg-teal-400"
+										class="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-xs bg-teal-500 text-neutral-950 shadow-[inset_0_-4px_0_rgba(0,0,0,0.22)] transition hover:bg-teal-400"
 										type="button"
 										aria-label={`Show ${event.title} on map`}
 										title="Show on map"

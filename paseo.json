@@ -5,7 +5,8 @@
 	"scripts": {
 		"web": {
 			"type": "service",
-			"command": "npm run dev -- --host 0.0.0.0 --port $PASEO_PORT"
+			"command": "npm run dev -- --host 0.0.0.0 --port $PASEO_PORT",
+			"port": 3333
 		}
 	}
 }
