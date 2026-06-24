@@ -1,6 +1,16 @@
 <script lang="ts">
 	import type { PageProps } from './$types';
-	import { Copy, Link, MapPin, Upload } from '@lucide/svelte';
+	import { page } from '$app/state';
+	import {
+		ChevronDown,
+		ChevronUp,
+		Copy,
+		Link,
+		MapPin,
+		Maximize2,
+		Minimize2,
+		Upload
+	} from '@lucide/svelte';
 	import { onMount } from 'svelte';
 	import { MapLibre, Marker, NavigationControl, Popup, ScaleControl } from 'svelte-maplibre-gl';
 
@@ -8,6 +18,8 @@
 	let selectedId = $state<string | null>(null);
 	let sourceMode = $state<'url' | 'file'>('url');
 	let timeZone = $state('UTC');
+	let isFullscreen = $state(readFullscreenSearchParam(page.url.searchParams));
+	let isEventsCollapsed = $state(false);
 	let copyStatus = $state<'idle' | 'copied' | 'error'>('idle');
 	let calendar = $derived(form ?? data);
 
@@ -25,13 +37,16 @@
 		day: 'numeric',
 		year: '2-digit'
 	});
-	const dateTimeFormatter = new Intl.DateTimeFormat('en-US', {
-		month: 'numeric',
-		day: 'numeric',
-		year: '2-digit',
-		hour: 'numeric',
-		minute: '2-digit'
-	});
+	const dateTimeFormatter = $derived(
+		new Intl.DateTimeFormat('en-US', {
+			month: 'numeric',
+			day: 'numeric',
+			year: '2-digit',
+			timeZone: calendar.timeZone,
+			hour: 'numeric',
+			minute: '2-digit'
+		})
+	);
 
 	function formatDateOnly(value: string) {
 		return dateFormatter.format(new Date(`${value}T00:00:00`));
@@ -53,8 +68,32 @@
 		shareUrl.searchParams.set('start', calendar.startDate);
 		shareUrl.searchParams.set('end', calendar.endDate);
 		shareUrl.searchParams.set('timeZone', calendar.timeZone);
+		if (isFullscreen) shareUrl.searchParams.set('fullscreen', 'true');
 
 		return shareUrl.toString();
+	}
+
+	function readFullscreenSearchParam(searchParams: URLSearchParams) {
+		const value = searchParams.get('fullscreen');
+
+		return value === 'true' || value === '1';
+	}
+
+	function writeFullscreenSearchParam(value: boolean) {
+		const url = new URL(window.location.href);
+
+		if (value) {
+			url.searchParams.set('fullscreen', 'true');
+		} else {
+			url.searchParams.delete('fullscreen');
+		}
+
+		window.history.replaceState(window.history.state, '', url);
+	}
+
+	function toggleFullscreen() {
+		isFullscreen = !isFullscreen;
+		writeFullscreenSearchParam(isFullscreen);
 	}
 
 	async function copyShareLink() {
@@ -85,7 +124,10 @@
 	}
 
 	onMount(() => {
-		timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || timeZone;
+		timeZone =
+			calendar.timeZone !== 'UTC'
+				? calendar.timeZone
+				: Intl.DateTimeFormat().resolvedOptions().timeZone || timeZone;
 	});
 </script>
 
@@ -100,14 +142,30 @@
 <main
 	class="min-h-screen bg-neutral-950 bg-[url($lib/assets/img/cartographer.png)] text-neutral-100"
 >
-	<section class="bg-[#00000060] px-4 py-5 shadow-2xl shadow-black/20 sm:p-6 lg:p-8">
+	<section class="bg-[#00000060] p-4 shadow-2xl shadow-black/20 sm:p-6 lg:p-4">
 		<div class="mx-auto flex max-w-screen-2xl flex-col gap-5">
-			<div>
-				<h1 class="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">geocal</h1>
-				<p class="mt-2 max-w-2xl text-sm text-neutral-300">
-					Enter a public ICS feed URL or upload an .ics file and select a date range to plot the
-					events on the map.
-				</p>
+			<div class="flex items-start justify-between gap-4">
+				<div>
+					<h1 class="text-3xl font-semibold tracking-tight sm:text-4xl">geocal</h1>
+					<p class="mt-2 max-w-2xl text-sm text-neutral-300">
+						Enter a public ICS feed URL or upload an .ics file and select a date range to plot the
+						events on the map.
+					</p>
+				</div>
+				<a
+					class="shrink-0 text-teal-300 transition hover:text-teal-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-teal-300"
+					href="https://github.com/zanetaylor/geocal"
+					target="_blank"
+					rel="noreferrer"
+					aria-label="Open geocal on GitHub"
+					title="Open geocal on GitHub"
+				>
+					<svg class="block h-4 w-4" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+						<path
+							d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82A7.65 7.65 0 0 1 8 3.86c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"
+						/>
+					</svg>
+				</a>
 			</div>
 
 			<form
@@ -232,7 +290,11 @@
 	</section>
 
 	<section
-		class="relative h-[68vh] min-h-[540px] overflow-hidden bg-neutral-900 shadow-2xl shadow-black/30 sm:h-[calc(100vh-268px)] sm:min-h-[620px]"
+		class={`overflow-hidden bg-neutral-900 shadow-2xl shadow-black/30 ${
+			isFullscreen
+				? 'fixed inset-0 isolate z-[1000] h-[100dvh] min-h-[100dvh]'
+				: 'relative h-[68vh] min-h-[540px] sm:h-[calc(100vh-268px)] sm:min-h-[620px]'
+		}`}
 	>
 		<div class="absolute inset-0">
 			<MapLibre
@@ -241,7 +303,7 @@
 				zoom={11}
 				center={{ lng: -122.676483, lat: 45.523064 }}
 			>
-				<NavigationControl />
+				<NavigationControl position="bottom-right" />
 				<ScaleControl />
 
 				{#each mappedEvents as event (event.id)}
@@ -283,80 +345,120 @@
 			</MapLibre>
 		</div>
 
+		<div class="absolute top-2 right-2 z-20 flex gap-2 sm:top-4 sm:right-4">
+			<button
+				class="flex h-10 w-10 cursor-pointer items-center justify-center rounded-xs bg-neutral-950/85 text-teal-300 shadow-[inset_0_-4px_0_rgba(0,0,0,0.22)] backdrop-blur transition hover:bg-neutral-800 hover:text-teal-200 focus:ring-4 focus:ring-teal-300/40 focus:outline-none"
+				type="button"
+				onclick={toggleFullscreen}
+				aria-pressed={isFullscreen}
+				aria-label={isFullscreen ? 'Exit fullscreen map' : 'Open fullscreen map'}
+				title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+			>
+				{#if isFullscreen}
+					<Minimize2 class="h-4 w-4" aria-hidden="true" />
+				{:else}
+					<Maximize2 class="h-4 w-4" aria-hidden="true" />
+				{/if}
+			</button>
+		</div>
+
 		<aside
-			class="absolute inset-x-2 bottom-2 z-10 flex max-h-[45%] flex-col overflow-hidden rounded-xs bg-neutral-950/85 backdrop-blur sm:inset-x-4 sm:bottom-4 sm:max-h-[48%] lg:inset-x-auto lg:inset-y-8 lg:left-8 lg:max-h-none lg:w-[420px]"
+			class={`absolute top-2 right-14 left-2 z-10 flex flex-col overflow-hidden rounded-xs bg-neutral-950/85 backdrop-blur transition-[max-height,transform] sm:top-4 sm:right-16 sm:left-4 lg:right-auto lg:w-[420px] ${
+				isEventsCollapsed ? 'max-h-[96px]' : 'max-h-[45%] sm:max-h-[48%] lg:max-h-[calc(100%-2rem)]'
+			}`}
 		>
-			<div class="p-3 sm:p-4">
-				<h2 class="text-lg font-semibold sm:text-xl">Events</h2>
-				<p class="mt-1 text-sm text-neutral-400">{eventSummary}</p>
+			<div class="flex items-start justify-between gap-3 p-3 sm:p-4">
+				<div>
+					<h2 class="text-lg font-semibold sm:text-xl">Events</h2>
+					<p class="mt-1 text-sm text-neutral-400">{eventSummary}</p>
+				</div>
+				<button
+					class="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-xs bg-neutral-800 text-teal-300 shadow-[inset_0_-4px_0_rgba(0,0,0,0.22)] transition hover:bg-neutral-700 hover:text-teal-200 focus:ring-4 focus:ring-teal-300/40 focus:outline-none"
+					type="button"
+					onclick={() => (isEventsCollapsed = !isEventsCollapsed)}
+					aria-expanded={!isEventsCollapsed}
+					aria-controls="events-overlay-content"
+					aria-label={isEventsCollapsed ? 'Expand events list' : 'Collapse events list'}
+					title={isEventsCollapsed ? 'Expand events' : 'Collapse events'}
+				>
+					{#if isEventsCollapsed}
+						<ChevronDown class="h-4 w-4" aria-hidden="true" />
+					{:else}
+						<ChevronUp class="h-4 w-4" aria-hidden="true" />
+					{/if}
+				</button>
 			</div>
 
-			{#if calendar.warnings.length}
-				<div class="space-y-2 p-4">
-					{#each calendar.warnings as warning}
-						<p class="bg-neutral-800 px-3 py-2 text-sm text-neutral-200">{warning}</p>
-					{/each}
-				</div>
-			{/if}
+			<div id="events-overlay-content" class="flex min-h-0 flex-1 flex-col">
+				{#if !isEventsCollapsed && calendar.warnings.length}
+					<div class="space-y-2 p-4">
+						{#each calendar.warnings as warning}
+							<p class="bg-neutral-800 px-3 py-2 text-sm text-neutral-200">{warning}</p>
+						{/each}
+					</div>
+				{/if}
 
-			{#if calendar.feedError}
-				<div class="p-6 text-neutral-300">The calendar could not be loaded.</div>
-			{:else if calendar.events.length === 0}
-				<div class="bg-red-800 p-3 text-sm text-neutral-300">
-					Load feed URL or upload a file to map events.
-				</div>
-			{:else}
-				<div class="flex-1 divide-y divide-neutral-800 overflow-auto">
-					{#each calendar.events as event (event.id)}
-						<article
-							class={`p-4 transition hover:bg-neutral-800/60 ${selectedId === event.id ? 'bg-neutral-800' : ''}`}
-						>
-							<div class="flex items-start justify-between gap-3">
-								<div>
-									<h3 class="leading-tight font-semibold">{event.title}</h3>
-									<p class="mt-1 text-sm text-neutral-300">{formatDate(event.start)}</p>
+				{#if isEventsCollapsed}
+					<div class="sr-only">Events list collapsed.</div>
+				{:else if calendar.feedError}
+					<div class="p-6 text-neutral-300">The calendar could not be loaded.</div>
+				{:else if calendar.events.length === 0}
+					<div class="bg-red-800 p-3 text-sm text-neutral-300">
+						Load feed URL or upload a file to map events.
+					</div>
+				{:else}
+					<div class="flex-1 divide-y divide-neutral-800 overflow-auto">
+						{#each calendar.events as event (event.id)}
+							<article
+								class={`p-4 transition hover:bg-neutral-800/60 ${selectedId === event.id ? 'bg-neutral-800' : ''}`}
+							>
+								<div class="flex items-start justify-between gap-3">
+									<div>
+										<h3 class="leading-tight font-semibold">{event.title}</h3>
+										<p class="mt-1 text-sm text-neutral-300">{formatDate(event.start)}</p>
+									</div>
+									{#if event.coordinates}
+										<button
+											class="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-xs bg-teal-500 text-neutral-950 shadow-[inset_0_-4px_0_rgba(0,0,0,0.22)] transition hover:bg-teal-400"
+											type="button"
+											aria-label={`Show ${event.title} on map`}
+											title="Show on map"
+											onclick={() => (selectedId = selectedId === event.id ? null : event.id)}
+										>
+											<MapPin class="h-4 w-4" aria-hidden="true" />
+										</button>
+									{:else}
+										<span class="shrink-0 bg-neutral-800 px-3 py-1 text-xs text-neutral-400"
+											>Unmapped</span
+										>
+									{/if}
 								</div>
-								{#if event.coordinates}
-									<button
-										class="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-xs bg-teal-500 text-neutral-950 shadow-[inset_0_-4px_0_rgba(0,0,0,0.22)] transition hover:bg-teal-400"
-										type="button"
-										aria-label={`Show ${event.title} on map`}
-										title="Show on map"
-										onclick={() => (selectedId = selectedId === event.id ? null : event.id)}
-									>
-										<MapPin class="h-4 w-4" aria-hidden="true" />
-									</button>
-								{:else}
-									<span class="shrink-0 bg-neutral-800 px-3 py-1 text-xs text-neutral-400"
-										>Unmapped</span
-									>
+
+								{#if event.location}
+									<p class="mt-3 text-sm font-medium text-neutral-200">{event.location}</p>
 								{/if}
-							</div>
 
-							{#if event.location}
-								<p class="mt-3 text-sm font-medium text-neutral-200">{event.location}</p>
-							{/if}
+								{#if event.description}
+									<p class="mt-2 text-sm leading-6 text-neutral-400">
+										{descriptionPreview(event.description)}
+									</p>
+								{/if}
 
-							{#if event.description}
-								<p class="mt-2 text-sm leading-6 text-neutral-400">
-									{descriptionPreview(event.description)}
-								</p>
-							{/if}
-
-							{#if event.url}
-								<a
-									class="mt-3 inline-flex text-sm font-semibold text-teal-300 hover:text-teal-200"
-									href={event.url}
-									target="_blank"
-									rel="noreferrer"
-								>
-									Details
-								</a>
-							{/if}
-						</article>
-					{/each}
-				</div>
-			{/if}
+								{#if event.url}
+									<a
+										class="mt-3 inline-flex text-sm font-semibold text-teal-300 hover:text-teal-200"
+										href={event.url}
+										target="_blank"
+										rel="noreferrer"
+									>
+										Details
+									</a>
+								{/if}
+							</article>
+						{/each}
+					</div>
+				{/if}
+			</div>
 		</aside>
 	</section>
 </main>
