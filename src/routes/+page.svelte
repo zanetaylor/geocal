@@ -7,10 +7,12 @@
 	let selectedId = $state<string | null>(null);
 	let sourceMode = $state<'url' | 'file'>('url');
 	let timeZone = $state('UTC');
+	let copyStatus = $state<'idle' | 'copied' | 'error'>('idle');
 	let calendar = $derived(form ?? data);
 
 	let mappedEvents = $derived(calendar.events.filter((event) => event.coordinates));
 	let unmappedCount = $derived(calendar.events.length - mappedEvents.length);
+	let canCopyLink = $derived(Boolean(calendar.sourceUrl && !calendar.feedError));
 	let eventSummary = $derived(
 		`${mappedEvents.length} mapped / ${calendar.events.length} events from ${formatDateOnly(calendar.startDate)} to ${formatDateOnly(calendar.endDate)}${
 			unmappedCount > 0 ? ` - ${unmappedCount} not mapped` : ''
@@ -42,6 +44,45 @@
 		return value.length > 220 ? `${value.slice(0, 220).trim()}...` : value;
 	}
 
+	function buildShareUrl() {
+		const shareUrl = new URL(window.location.href);
+
+		shareUrl.search = '';
+		shareUrl.searchParams.set('feedUrl', calendar.sourceUrl);
+		shareUrl.searchParams.set('start', calendar.startDate);
+		shareUrl.searchParams.set('end', calendar.endDate);
+		shareUrl.searchParams.set('timeZone', calendar.timeZone);
+
+		return shareUrl.toString();
+	}
+
+	async function copyShareLink() {
+		if (!canCopyLink) return;
+
+		try {
+			const shareUrl = buildShareUrl();
+
+			if (navigator.clipboard?.writeText) {
+				await navigator.clipboard.writeText(shareUrl);
+			} else {
+				const textarea = document.createElement('textarea');
+
+				textarea.value = shareUrl;
+				textarea.style.position = 'fixed';
+				textarea.style.opacity = '0';
+				document.body.append(textarea);
+				textarea.select();
+				document.execCommand('copy');
+				textarea.remove();
+			}
+
+			copyStatus = 'copied';
+			window.setTimeout(() => (copyStatus = 'idle'), 1800);
+		} catch {
+			copyStatus = 'error';
+		}
+	}
+
 	onMount(() => {
 		timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || timeZone;
 	});
@@ -70,7 +111,7 @@
 			<form
 				method="POST"
 				enctype="multipart/form-data"
-				class="grid w-full grid-cols-1 items-end gap-3 sm:grid-cols-2 lg:grid-cols-[auto_minmax(14rem,2fr)_minmax(9rem,0.8fr)_minmax(9rem,0.8fr)_auto]"
+				class="grid w-full grid-cols-1 items-end gap-3 sm:grid-cols-2 lg:grid-cols-[auto_minmax(14rem,2fr)_minmax(9rem,0.8fr)_minmax(9rem,0.8fr)_auto_auto]"
 			>
 				<input type="hidden" name="timeZone" value={timeZone} />
 				<div class="grid gap-1.5 text-sm font-medium text-neutral-200">
@@ -142,12 +183,25 @@
 						value={calendar.endDate}
 					/>
 				</label>
-				<button
-					class="h-12 rounded-xs bg-teal-500 px-4 font-semibold text-neutral-950 shadow-[inset_0_-4px_0_rgba(0,0,0,0.22)] transition cursor-pointer hover:bg-teal-400 sm:col-span-2 sm:h-11 lg:col-span-1"
-					type="submit"
-				>
-					Go!
-				</button>
+				<div class="flex gap-3 sm:col-span-2 lg:col-span-2">
+					<button
+						class="h-12 flex-1 rounded-xs bg-teal-500 px-4 font-semibold text-neutral-950 shadow-[inset_0_-4px_0_rgba(0,0,0,0.22)] transition cursor-pointer hover:bg-teal-400 sm:h-11"
+						type="submit"
+					>
+						Go!
+					</button>
+					<button
+						class={`h-12 flex-1 rounded-xs px-4 font-semibold transition sm:h-11 ${canCopyLink
+							? 'cursor-pointer bg-neutral-800 text-teal-300 shadow-[inset_0_-4px_0_rgba(0,0,0,0.22)] hover:bg-neutral-700 hover:text-teal-200'
+							: 'cursor-not-allowed bg-neutral-900 text-neutral-600'}`}
+						type="button"
+						disabled={!canCopyLink}
+						onclick={copyShareLink}
+						title={canCopyLink ? 'Copy a link that reloads this feed' : 'Load a feed URL to copy a link'}
+					>
+						{copyStatus === 'copied' ? 'Copied!' : copyStatus === 'error' ? 'Copy failed' : 'Copy link'}
+					</button>
+				</div>
 			</form>
 		</div>
 	</section>
@@ -238,7 +292,7 @@
 								</div>
 								{#if event.coordinates}
 									<button
-										class="shrink-0 bg-teal-500 px-3 py-1 text-xs font-semibold text-neutral-950 rounded-xs cursor-pointer hover:bg-teal-400"
+										class="shrink-0 bg-teal-500 px-3 py-1 text-xs font-semibold text-neutral-950 rounded-xs shadow-[inset_0_-4px_0_rgba(0,0,0,0.22)] cursor-pointer hover:bg-teal-400"
 										type="button"
 										onclick={() => (selectedId = selectedId === event.id ? null : event.id)}
 									>
