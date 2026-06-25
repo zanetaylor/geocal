@@ -153,7 +153,7 @@
 					</p>
 				</div>
 				<a
-					class="mt-1 shrink-0 text-teal-300 transition hover:text-teal-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-teal-300"
+					class="mt-1 shrink-0 text-teal-300 transition hover:text-teal-200 focus-visible:outline focus-visible:outline-offset-4 focus-visible:outline-teal-300"
 					href="https://github.com/zanetaylor/geocal"
 					target="_blank"
 					rel="noreferrer"
@@ -292,8 +292,8 @@
 	<section
 		class={`overflow-hidden bg-neutral-900 shadow-2xl shadow-black/30 ${
 			isFullscreen
-				? 'fixed inset-0 isolate z-[1000] h-[100dvh] min-h-[100dvh]'
-				: 'relative h-[68vh] min-h-[540px] sm:h-[calc(100vh-268px)] sm:min-h-[620px]'
+				? 'min-h-100dvh h-100dvh fixed inset-0 isolate z-100'
+				: 'relative h-[68vh] min-h-135 sm:h-[calc(100vh-268px)] sm:min-h-155'
 		}`}
 	>
 		<div class="absolute inset-0">
@@ -363,8 +363,8 @@
 		</div>
 
 		<aside
-			class={`absolute top-2 right-14 left-2 z-10 flex flex-col overflow-hidden rounded-xs bg-neutral-950/85 backdrop-blur transition-[max-height,transform] sm:top-4 sm:right-16 sm:left-4 lg:right-auto lg:w-[420px] ${
-				isEventsCollapsed ? 'max-h-[96px]' : 'max-h-[45%] sm:max-h-[48%] lg:max-h-[calc(100%-2rem)]'
+			class={`absolute top-2 right-14 left-2 z-10 flex flex-col overflow-hidden rounded-xs bg-neutral-950/85 backdrop-blur transition-[max-height,transform] sm:top-4 sm:right-16 sm:left-4 lg:right-auto lg:w-105 ${
+				isEventsCollapsed ? 'max-h-24' : 'max-h-[45%] sm:max-h-[48%] lg:max-h-[calc(100%-2rem)]'
 			}`}
 		>
 			<div class="flex items-start justify-between gap-3 p-3 sm:p-4">
