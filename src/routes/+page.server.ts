@@ -62,7 +62,7 @@ type CachedCalendarFeed = {
 
 type GeocodeStatus = 'found' | 'not_found' | 'error';
 
-export type CachedGeocode = {
+type CachedGeocode = {
 	coordinates: [number, number] | null;
 	status: GeocodeStatus;
 	cachedAt: number;
@@ -519,14 +519,14 @@ function createCachedGeocode(
 	};
 }
 
-export function geocodeTtl(geocode: CachedGeocode) {
+function geocodeTtl(geocode: CachedGeocode) {
 	if (geocode.status === 'found') return GEOCODE_FOUND_TTL_SECONDS;
 	if (geocode.status === 'not_found') return GEOCODE_NOT_FOUND_TTL_SECONDS;
 
 	return GEOCODE_ERROR_TTL_SECONDS;
 }
 
-export function isFreshCachedGeocode(value: CachedGeocode | null): value is CachedGeocode {
+function isFreshCachedGeocode(value: CachedGeocode | null): value is CachedGeocode {
 	if (!value || !isCoordinatesOrNull(value.coordinates)) {
 		return false;
 	}
@@ -647,11 +647,18 @@ function isDateInputValue(value: string | null): value is string {
 	return Boolean(value?.match(/^\d{4}-\d{2}-\d{2}$/));
 }
 
-export function eventInRange(event: CalendarEvent, range: ReturnType<typeof getDateRange>) {
+function eventInRange(event: CalendarEvent, range: ReturnType<typeof getDateRange>) {
 	const eventStartDate = toDateInputValue(new Date(event.start), range.timeZone);
 
 	return eventStartDate >= range.startDate && eventStartDate <= range.endDate;
 }
+
+export {
+	geocodeTtl as _geocodeTtl,
+	isFreshCachedGeocode as _isFreshCachedGeocode,
+	eventInRange as _eventInRange
+};
+export type { CachedGeocode as _CachedGeocode };
 
 function readString(field: ParsedField) {
 	const value = typeof field === 'object' && field && 'value' in field ? field.value : field;

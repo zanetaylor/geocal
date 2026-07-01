@@ -1,8 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { CalendarEvent, CachedGeocode } from './+page.server';
-import { eventInRange, geocodeTtl, isFreshCachedGeocode } from './+page.server';
+import type { CalendarEvent, _CachedGeocode } from './+page.server';
+import {
+	_eventInRange as eventInRange,
+	_geocodeTtl as geocodeTtl,
+	_isFreshCachedGeocode as isFreshCachedGeocode
+} from './+page.server';
 
-function cachedGeocode(value: Partial<CachedGeocode> = {}): CachedGeocode {
+function cachedGeocode(value: Partial<_CachedGeocode> = {}): _CachedGeocode {
 	return {
 		coordinates: [-122.676483, 45.523064],
 		status: 'found',
