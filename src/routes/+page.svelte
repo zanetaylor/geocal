@@ -1,16 +1,16 @@
 <script lang="ts">
 	import type { PageProps } from './$types';
 	import { page } from '$app/state';
+	import { Copy, Link, MapPin, Maximize2, Minimize2, Upload } from '@lucide/svelte';
+	import EventsPanel from '$lib/components/EventsPanel.svelte';
 	import {
-		ChevronDown,
-		ChevronUp,
-		Copy,
-		Link,
-		MapPin,
-		Maximize2,
-		Minimize2,
-		Upload
-	} from '@lucide/svelte';
+		buildShareUrl as buildShareUrlFromState,
+		createDateTimeFormatter,
+		formatDate as formatDateWithFormatter,
+		formatDateOnly,
+		readFullscreenSearchParam,
+		setFullscreenSearchParam
+	} from '$lib/calendar/presentation';
 	import { onMount } from 'svelte';
 	import { MapLibre, Marker, NavigationControl, Popup, ScaleControl } from 'svelte-maplibre-gl';
 
@@ -31,62 +31,27 @@
 			unmappedCount > 0 ? ` - ${unmappedCount} not mapped` : ''
 		}`
 	);
+	const COPY_STATUS_RESET_DELAY_MS = 1800;
 
-	const dateFormatter = new Intl.DateTimeFormat('en-US', {
-		month: 'numeric',
-		day: 'numeric',
-		year: '2-digit'
-	});
-	const dateTimeFormatter = $derived(
-		new Intl.DateTimeFormat('en-US', {
-			month: 'numeric',
-			day: 'numeric',
-			year: '2-digit',
-			timeZone: calendar.timeZone,
-			hour: 'numeric',
-			minute: '2-digit'
-		})
-	);
-
-	function formatDateOnly(value: string) {
-		return dateFormatter.format(new Date(`${value}T00:00:00`));
-	}
+	const dateTimeFormatter = $derived(createDateTimeFormatter(calendar.timeZone));
 
 	function formatDate(value: string) {
-		return dateTimeFormatter.format(new Date(value));
-	}
-
-	function descriptionPreview(value: string) {
-		return value.length > 220 ? `${value.slice(0, 220).trim()}...` : value;
+		return formatDateWithFormatter(value, dateTimeFormatter);
 	}
 
 	function buildShareUrl() {
-		const shareUrl = new URL(window.location.href);
-
-		shareUrl.search = '';
-		shareUrl.searchParams.set('feedUrl', calendar.sourceUrl);
-		shareUrl.searchParams.set('start', calendar.startDate);
-		shareUrl.searchParams.set('end', calendar.endDate);
-		shareUrl.searchParams.set('timeZone', calendar.timeZone);
-		if (isFullscreen) shareUrl.searchParams.set('fullscreen', 'true');
-
-		return shareUrl.toString();
-	}
-
-	function readFullscreenSearchParam(searchParams: URLSearchParams) {
-		const value = searchParams.get('fullscreen');
-
-		return value === 'true' || value === '1';
+		return buildShareUrlFromState({
+			currentHref: window.location.href,
+			sourceUrl: calendar.sourceUrl,
+			startDate: calendar.startDate,
+			endDate: calendar.endDate,
+			timeZone: calendar.timeZone,
+			isFullscreen
+		});
 	}
 
 	function writeFullscreenSearchParam(value: boolean) {
-		const url = new URL(window.location.href);
-
-		if (value) {
-			url.searchParams.set('fullscreen', 'true');
-		} else {
-			url.searchParams.delete('fullscreen');
-		}
+		const url = setFullscreenSearchParam(window.location.href, value);
 
 		window.history.replaceState(window.history.state, '', url);
 	}
@@ -117,7 +82,7 @@
 			}
 
 			copyStatus = 'copied';
-			window.setTimeout(() => (copyStatus = 'idle'), 1800);
+			window.setTimeout(() => (copyStatus = 'idle'), COPY_STATUS_RESET_DELAY_MS);
 		} catch {
 			copyStatus = 'error';
 		}
@@ -292,7 +257,7 @@
 	<section
 		class={`overflow-hidden bg-neutral-900 shadow-2xl shadow-black/30 ${
 			isFullscreen
-				? 'min-h-100dvh h-100dvh fixed inset-0 isolate z-100'
+				? 'fixed inset-0 isolate z-[1000] h-[100dvh] min-h-[100dvh]'
 				: 'relative h-[68vh] min-h-135 sm:h-[calc(100vh-268px)] sm:min-h-155'
 		}`}
 	>
@@ -362,103 +327,16 @@
 			</button>
 		</div>
 
-		<aside
-			class={`absolute top-2 right-14 left-2 z-10 flex flex-col overflow-hidden rounded-xs bg-neutral-950/85 backdrop-blur transition-[max-height,transform] sm:top-4 sm:right-16 sm:left-4 lg:right-auto lg:w-105 ${
-				isEventsCollapsed ? 'max-h-24' : 'max-h-[45%] sm:max-h-[48%] lg:max-h-[calc(100%-2rem)]'
-			}`}
-		>
-			<div class="flex items-start justify-between gap-3 p-3 sm:p-4">
-				<div>
-					<h2 class="text-lg font-semibold sm:text-xl">Events</h2>
-					<p class="mt-1 text-sm text-neutral-400">{eventSummary}</p>
-				</div>
-				<button
-					class="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-xs bg-neutral-800 text-teal-300 shadow-[inset_0_-4px_0_rgba(0,0,0,0.22)] transition hover:bg-neutral-700 hover:text-teal-200 focus:ring-4 focus:ring-teal-300/40 focus:outline-none"
-					type="button"
-					onclick={() => (isEventsCollapsed = !isEventsCollapsed)}
-					aria-expanded={!isEventsCollapsed}
-					aria-controls="events-overlay-content"
-					aria-label={isEventsCollapsed ? 'Expand events list' : 'Collapse events list'}
-					title={isEventsCollapsed ? 'Expand events' : 'Collapse events'}
-				>
-					{#if isEventsCollapsed}
-						<ChevronDown class="h-4 w-4" aria-hidden="true" />
-					{:else}
-						<ChevronUp class="h-4 w-4" aria-hidden="true" />
-					{/if}
-				</button>
-			</div>
-
-			<div id="events-overlay-content" class="flex min-h-0 flex-1 flex-col">
-				{#if !isEventsCollapsed && calendar.warnings.length}
-					<div class="space-y-2 p-4">
-						{#each calendar.warnings as warning}
-							<p class="bg-neutral-800 px-3 py-2 text-sm text-neutral-200">{warning}</p>
-						{/each}
-					</div>
-				{/if}
-
-				{#if isEventsCollapsed}
-					<div class="sr-only">Events list collapsed.</div>
-				{:else if calendar.feedError}
-					<div class="p-6 text-neutral-300">The calendar could not be loaded.</div>
-				{:else if calendar.events.length === 0}
-					<div class="bg-red-800 p-3 text-sm text-neutral-300">
-						Load feed URL or upload a file to map events.
-					</div>
-				{:else}
-					<div class="flex-1 divide-y divide-neutral-800 overflow-auto">
-						{#each calendar.events as event (event.id)}
-							<article
-								class={`p-4 transition hover:bg-neutral-800/60 ${selectedId === event.id ? 'bg-neutral-800' : ''}`}
-							>
-								<div class="flex items-start justify-between gap-3">
-									<div>
-										<h3 class="leading-tight font-semibold">{event.title}</h3>
-										<p class="mt-1 text-sm text-neutral-300">{formatDate(event.start)}</p>
-									</div>
-									{#if event.coordinates}
-										<button
-											class="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-xs bg-teal-500 text-neutral-950 shadow-[inset_0_-4px_0_rgba(0,0,0,0.22)] transition hover:bg-teal-400"
-											type="button"
-											aria-label={`Show ${event.title} on map`}
-											title="Show on map"
-											onclick={() => (selectedId = selectedId === event.id ? null : event.id)}
-										>
-											<MapPin class="h-4 w-4" aria-hidden="true" />
-										</button>
-									{:else}
-										<span class="shrink-0 bg-neutral-800 px-3 py-1 text-xs text-neutral-400"
-											>Unmapped</span
-										>
-									{/if}
-								</div>
-
-								{#if event.location}
-									<p class="mt-3 text-sm font-medium text-neutral-200">{event.location}</p>
-								{/if}
-
-								{#if event.description}
-									<p class="mt-2 text-sm leading-6 text-neutral-400">
-										{descriptionPreview(event.description)}
-									</p>
-								{/if}
-
-								{#if event.url}
-									<a
-										class="mt-3 inline-flex text-sm font-semibold text-teal-300 hover:text-teal-200"
-										href={event.url}
-										target="_blank"
-										rel="noreferrer"
-									>
-										Details
-									</a>
-								{/if}
-							</article>
-						{/each}
-					</div>
-				{/if}
-			</div>
-		</aside>
+		<EventsPanel
+			events={calendar.events}
+			warnings={calendar.warnings}
+			feedError={calendar.feedError}
+			{selectedId}
+			isCollapsed={isEventsCollapsed}
+			{eventSummary}
+			{formatDate}
+			onToggleCollapsed={() => (isEventsCollapsed = !isEventsCollapsed)}
+			onToggleSelected={(id) => (selectedId = selectedId === id ? null : id)}
+		/>
 	</section>
 </main>

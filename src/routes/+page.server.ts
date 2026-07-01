@@ -62,7 +62,7 @@ type CachedCalendarFeed = {
 
 type GeocodeStatus = 'found' | 'not_found' | 'error';
 
-type CachedGeocode = {
+export type CachedGeocode = {
 	coordinates: [number, number] | null;
 	status: GeocodeStatus;
 	cachedAt: number;
@@ -385,11 +385,12 @@ async function geocodeLocationBatch(locations: string[], cache: CacheStore) {
 
 		await Promise.all(
 			results.map(async (result, index) => {
-				const location = locations[index];
-				const geocode = createCachedGeocode(coordinatesFromGeocodeResult(result));
-
-				geocodes.set(location, geocode);
-				await writeGeocodeCache(cache, location, geocode);
+				await persistCachedGeocode(
+					cache,
+					geocodes,
+					locations[index],
+					createCachedGeocode(coordinatesFromGeocodeResult(result))
+				);
 			})
 		);
 
@@ -405,16 +406,16 @@ async function geocodeLocationBatch(locations: string[], cache: CacheStore) {
 					country: ['us'],
 					proximity: PORTLAND_CENTER
 				});
-				const geocode = createCachedGeocode(coordinatesFromGeocodeResult(result));
-
-				geocodes.set(location, geocode);
-				await writeGeocodeCache(cache, location, geocode);
+				await persistCachedGeocode(
+					cache,
+					geocodes,
+					location,
+					createCachedGeocode(coordinatesFromGeocodeResult(result))
+				);
 			} catch (fallbackError) {
 				failedCount += 1;
-				const geocode = createCachedGeocode(null, 'error');
 
-				geocodes.set(location, geocode);
-				await writeGeocodeCache(cache, location, geocode);
+				await persistCachedGeocode(cache, geocodes, location, createCachedGeocode(null, 'error'));
 				console.warn(`MapTiler geocoding failed for "${location}".`, fallbackError);
 			}
 		}
@@ -497,6 +498,16 @@ async function writeGeocodeCache(cache: CacheStore, location: string, geocode: C
 	);
 }
 
+async function persistCachedGeocode(
+	cache: CacheStore,
+	geocodes: Map<string, CachedGeocode>,
+	location: string,
+	geocode: CachedGeocode
+) {
+	geocodes.set(location, geocode);
+	await writeGeocodeCache(cache, location, geocode);
+}
+
 function createCachedGeocode(
 	coordinates: [number, number] | null,
 	status: GeocodeStatus = coordinates ? 'found' : 'not_found'
@@ -508,14 +519,14 @@ function createCachedGeocode(
 	};
 }
 
-function geocodeTtl(geocode: CachedGeocode) {
+export function geocodeTtl(geocode: CachedGeocode) {
 	if (geocode.status === 'found') return GEOCODE_FOUND_TTL_SECONDS;
 	if (geocode.status === 'not_found') return GEOCODE_NOT_FOUND_TTL_SECONDS;
 
 	return GEOCODE_ERROR_TTL_SECONDS;
 }
 
-function isFreshCachedGeocode(value: CachedGeocode | null): value is CachedGeocode {
+export function isFreshCachedGeocode(value: CachedGeocode | null): value is CachedGeocode {
 	if (!value || !isCoordinatesOrNull(value.coordinates)) {
 		return false;
 	}
@@ -526,11 +537,11 @@ function isFreshCachedGeocode(value: CachedGeocode | null): value is CachedGeoco
 function isCachedCalendarFeed(value: CachedCalendarFeed | null): value is CachedCalendarFeed {
 	return Boolean(
 		value &&
-		typeof value.text === 'string' &&
-		typeof value.name === 'string' &&
-		typeof value.cachedAt === 'number' &&
-		typeof value.freshUntil === 'number' &&
-		typeof value.staleUntil === 'number'
+			typeof value.text === 'string' &&
+			typeof value.name === 'string' &&
+			typeof value.cachedAt === 'number' &&
+			typeof value.freshUntil === 'number' &&
+			typeof value.staleUntil === 'number'
 	);
 }
 
@@ -636,7 +647,7 @@ function isDateInputValue(value: string | null): value is string {
 	return Boolean(value?.match(/^\d{4}-\d{2}-\d{2}$/));
 }
 
-function eventInRange(event: CalendarEvent, range: ReturnType<typeof getDateRange>) {
+export function eventInRange(event: CalendarEvent, range: ReturnType<typeof getDateRange>) {
 	const eventStartDate = toDateInputValue(new Date(event.start), range.timeZone);
 
 	return eventStartDate >= range.startDate && eventStartDate <= range.endDate;
