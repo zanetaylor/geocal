@@ -13,6 +13,7 @@
 	} from '$lib/calendar/presentation';
 	import { onMount } from 'svelte';
 	import { MapLibre, Marker, NavigationControl, Popup, ScaleControl } from 'svelte-maplibre-gl';
+	import Brand from '$lib/assets/svg/mark.svg.svelte';
 
 	let { data, form }: PageProps = $props();
 	let selectedId = $state<string | null>(null);
@@ -97,7 +98,7 @@
 </script>
 
 <svelte:head>
-	<title>geocal - calendar → map</title>
+	<title>geocal // calendar → map</title>
 	<meta
 		name="description"
 		content="Interactive map of events from an iCal feed or uploaded iCal file."
@@ -111,7 +112,8 @@
 		<div class="mx-auto flex max-w-screen-2xl flex-col gap-5">
 			<div class="flex items-start justify-between gap-4">
 				<div>
-					<h1 class="text-3xl font-semibold tracking-tight sm:text-4xl">geocal</h1>
+					<Brand />
+					<!-- <h1 class="text-3xl font-semibold tracking-tight sm:text-4xl">geocal</h1> -->
 					<p class="mt-2 text-sm text-neutral-300">
 						Enter a public ICS feed URL or upload an .ics file and select a date range to plot the
 						events on the map.
